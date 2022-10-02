@@ -33,7 +33,7 @@ func main() {
   
   fileList := widget.NewList(
       func() int { return len(data) },
-      func() fyne.CanvasObject { return container.NewPadded(container.NewPadded(widget.NewLabel("")), container.NewPadded(widget.NewButtonWithIcon("Download", theme.DownloadIcon(), nil)), container.NewPadded(widget.NewButtonWithIcon("Delete", theme.DeleteIcon(), nil))) },
+      func() fyne.CanvasObject { return container.NewGridWithColumns(3, container.NewPadded(widget.NewLabel("")), container.NewPadded(widget.NewButtonWithIcon("Download", theme.DownloadIcon(), nil)), container.NewPadded(widget.NewButtonWithIcon("Delete", theme.DeleteIcon(), nil))) },
       func(i widget.ListItemID, o fyne.CanvasObject) {
         o.(*fyne.Container).Objects[0].(*fyne.Container).Objects[0].(*widget.Label).SetText(data[i])
         o.(*fyne.Container).Objects[1].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
