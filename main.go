@@ -2,14 +2,13 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"time"
-
+  "github.com/BitlyTwiser/throw/src/toolbar"
+  "github.com/BitlyTwiser/throw/src/pufs_client"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
@@ -19,40 +18,22 @@ func main() {
   w := a.NewWindow("Filesystem")
   w.SetMaster()
   w.Resize(fyne.NewSize(500, 500))  
-
+  
+  // Unsubscribes client when application closes 
+  defer pufs_client.UnsubscribeOnClose()
   data := []string{"One", "Two", "Three"}
 
-  uploadFile := func() {
-      dialog.NewFileOpen(func(f fyne.URIReadCloser, _ error) { 
-        if f == nil {
-          log.Println("No file selected")
-          return
-        }
-
-        data, err := io.ReadAll(f)
-
-        if err != nil {
-          log.Printf("Error in reading file data. Error: %v", err)
-
-          return
-        }
-
-        result := fyne.NewStaticResource("File", data)
-        
-        entry := widget.NewMultiLineEntry()
-        entry.SetText(string(result.StaticContent))
-
-        w := fyne.CurrentApp().NewWindow(string(result.StaticName))
-        w.SetContent(container.NewScroll(entry))
-
-        w.Resize(fyne.NewSize(400,400))
-        w.Show()
-
-      }, w).Show()}
   
   toolbar := widget.NewToolbar(
-    widget.NewToolbarAction(theme.DocumentCreateIcon(), func() { uploadFile() } ),
+    widget.NewToolbarAction(theme.DocumentCreateIcon(), func() { toolbar.UploadFile(w) } ),
         widget.NewToolbarSeparator(),
+        widget.NewToolbarAction(theme.SettingsIcon(), func() {
+
+    }),
+        widget.NewToolbarSpacer(),
+        widget.NewToolbarAction(theme.HelpIcon(), func() {
+
+    }),
         )
   
   fileList := widget.NewList(

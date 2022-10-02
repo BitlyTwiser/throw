@@ -1,9 +1,9 @@
 package pufs_client
 
 import (
-  "fmt"
+  "log"
 )
 
-func Test(){
-  fmt.Println("Hello")
+func UnsubscribeOnClose(){
+  log.Println("Death")
 }
