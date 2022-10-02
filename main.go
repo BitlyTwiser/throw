@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"time"
+  "math/rand"
+ // "context"
   "github.com/BitlyTwiser/throw/src/toolbar"
   "github.com/BitlyTwiser/throw/src/pufs_client"
 	"fyne.io/fyne/v2"
@@ -11,16 +13,16 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+
+	pufs_pb "github.com/BitlyTwiser/pufs-server/proto"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
-func main() {
-  a := app.New() 
-  w := a.NewWindow("Filesystem")
-  w.SetMaster()
-  w.Resize(fyne.NewSize(500, 500))  
-  
-  // Unsubscribes client when application closes 
-  defer pufs_client.UnsubscribeOnClose()
+func initializeUI(w fyne.Window, client pufs_pb.IpfsFileSystemClient) {
+  // Load files here.
+  // Spawn alternate thread to handle the file watching.
   data := []string{"One", "Two", "Three"}
 
   toolbar := widget.NewToolbar(
@@ -35,7 +37,7 @@ func main() {
       func() int { return len(data) },
       func() fyne.CanvasObject { return container.NewGridWithColumns(3, container.NewPadded(widget.NewLabel("")), container.NewPadded(widget.NewButtonWithIcon("Download", theme.DownloadIcon(), nil)), container.NewPadded(widget.NewButtonWithIcon("Delete", theme.DeleteIcon(), nil))) },
       func(i widget.ListItemID, o fyne.CanvasObject) {
-        o.(*fyne.Container).Objects[0].(*fyne.Container).Objects[0].(*widget.Label).SetText(data[i])
+      o.(*fyne.Container).Objects[0].(*fyne.Container).Objects[0].(*widget.Label).SetText(fmt.Sprintf("Name: %v", data[i]))
         o.(*fyne.Container).Objects[1].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
           fmt.Printf("Hello from download. Data: %v", data[i])
         }
@@ -56,9 +58,38 @@ func main() {
   content := container.NewBorder(toolbar, nil, nil, nil, fileList)
   
   w.SetContent(content)
-  //w.SetContent(container.New(layout.NewAdaptiveGridLayout(2), c, uploadLayout))
+}
 
-  //w.Resize(fyne.NewSize(500, 500))
+var id int64
+
+func main() {
+  a := app.New() 
+  w := a.NewWindow("Filesystem")
+  w.SetMaster()
+  w.Resize(fyne.NewSize(500, 500))  
+  
+	id = int64(rand.Intn(100))
+  
+  // Must load values for address and server port from storage.
+  // The settings page will store these values.
+	conn, err := grpc.Dial(fmt.Sprintf("%v:%v", "127.0.0.1", 9000), grpc.WithTransportCredentials(insecure.NewCredentials()))
+  
+	if err != nil {
+		log.Fatalf("Error connection to server: %v", err)
+	} else {
+    log.Println("Connected to gRPC server")
+  }
+
+	defer conn.Close()
+
+	c := pufs_pb.NewIpfsFileSystemClient(conn)
+  // Remove here and generate new context within functions
+	//ctx, cancel := context.WithCancel(context.Background())
+	//defer cancel()
+
+  defer pufs_client.UnsubscribeOnClose()
+  
+  initializeUI(w, c)
 
   w.ShowAndRun()
 }
