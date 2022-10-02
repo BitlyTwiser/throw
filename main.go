@@ -23,17 +23,12 @@ func main() {
   defer pufs_client.UnsubscribeOnClose()
   data := []string{"One", "Two", "Three"}
 
-  
   toolbar := widget.NewToolbar(
     widget.NewToolbarAction(theme.DocumentCreateIcon(), func() { toolbar.UploadFile(w) } ),
         widget.NewToolbarSeparator(),
-        widget.NewToolbarAction(theme.SettingsIcon(), func() {
-
-    }),
+        widget.NewToolbarAction(theme.SettingsIcon(), func() { toolbar.Settings() }),
         widget.NewToolbarSpacer(),
-        widget.NewToolbarAction(theme.HelpIcon(), func() {
-
-    }),
+        widget.NewToolbarAction(theme.HelpIcon(), func() { toolbar.HelpWindow() }),
         )
   
   fileList := widget.NewList(
