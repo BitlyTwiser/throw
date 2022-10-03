@@ -342,5 +342,5 @@ func (c *IpfsClient) UnsubscribeClient() {
   ctx, cancel := context.WithCancel(context.Background())
   defer cancel()
 
-  c.Client.UnsubscribeFileStream(ctx, &pufs_pb.FilesRequest{Id: client.Id})
+  c.Client.UnsubscribeFileStream(ctx, &pufs_pb.FilesRequest{Id: c.Id})
 }
