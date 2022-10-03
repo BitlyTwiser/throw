@@ -87,12 +87,14 @@ func main() {
 	defer conn.Close()
 
 	c := pufs_pb.NewIpfsFileSystemClient(conn)
-	// Remove here and generate new context within functions
-	//ctx, cancel := context.WithCancel(context.Background())
-	//defer cancel()
+  
+  client := pufs_client.IpfsClient{Id: id, Client: c}
+  // Remove  client after connection ends
+	defer client.UnsubscribeClient()
 
-	defer pufs_client.UnsubscribeOnClose()
-
+  go client.SubscribeFileStream()
+  
+  // Initialize the UI elements.
 	initializeUI(w, c)
 
 	w.ShowAndRun()

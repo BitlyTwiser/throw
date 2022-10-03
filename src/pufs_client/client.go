@@ -298,7 +298,7 @@ func (c *IpfsClient) SubscribeFileStream() {
 
 		// Retrun on failure
 		if err != nil || stream == nil {
-			log.Println("Error or stream not empty")
+			log.Println("Error or stream not empty, waiting for 5 seconds")
 			time.Sleep(time.Second * 5)
 
 			continue
@@ -320,6 +320,7 @@ func (c *IpfsClient) SubscribeFileStream() {
         
         // Adjust file data here.
 				fmt.Printf("File: %v", file.Files)
+        fmt.Println("I am here")
 			}
 		}
 	}
