@@ -18,14 +18,24 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func UploadFileStream(client pufs_pb.IpfsFileSystemClient, fileData *os.File, fileSize int64, fileName string) error {
+type IpfsClient struct {
+  Id int64
+  Client pufs_pb.IpfsFileSystemClient
+}
+
+type FileData struct {
+  fileSize int64
+  fileName string
+}
+
+func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileName string) error {
 	var wg sync.WaitGroup
 	log.Printf("Sending large file.. File Size: %v", fileSize)
 	// Look to make the time variables depending on file size as well.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	fileUpload, err := client.UploadFileStream(ctx)
+	fileUpload, err := c.Client.UploadFileStream(ctx)
 
 	if err != nil {
 		return err
@@ -96,7 +106,7 @@ func UploadFileStream(client pufs_pb.IpfsFileSystemClient, fileData *os.File, fi
 	return nil
 }
 
-func UploadFile(path, fileName string, client pufs_pb.IpfsFileSystemClient, ctx context.Context) error {
+func (c *IpfsClient) UploadFile(path, fileName string) error {
 	file, err := os.OpenFile(fmt.Sprintf("%v%v", path, fileName), os.O_RDONLY, 0400)
 
 	if err != nil {
@@ -114,7 +124,7 @@ func UploadFile(path, fileName string, client pufs_pb.IpfsFileSystemClient, ctx 
 	//gRPC data size cap at 4MB
 	if fileSize >= (2 << 21) {
 		log.Println("Sending big file")
-		err = uploadFileStream(client, file, fileSize, fileName)
+		err = c.UploadFileStream(file, fileSize, fileName)
 
 		if err != nil {
 			return err
@@ -129,7 +139,7 @@ func UploadFile(path, fileName string, client pufs_pb.IpfsFileSystemClient, ctx 
 			return err
 		}
 
-		err = uploadFileData(ctx, client, fileData, fileSize, fileName)
+		err = c.UploadFileData(fileData, fileSize, fileName)
 
 		if err != nil {
 			return err
@@ -139,8 +149,11 @@ func UploadFile(path, fileName string, client pufs_pb.IpfsFileSystemClient, ctx 
 	return nil
 }
 
-func DeleteFile(fileName string, client pufs_pb.IpfsFileSystemClient, ctx context.Context) error {
-	resp, err := client.DeleteFile(ctx, &pufs_pb.DeleteFileRequest{FileName: fileName})
+func (c *IpfsClient) DeleteFile(fileName string) error {
+  ctx, cancel := context.WithCancel(context.Background())
+  defer cancel()
+
+	resp, err := c.Client.DeleteFile(ctx, &pufs_pb.DeleteFileRequest{FileName: fileName})
 
 	if err != nil {
 		return err
@@ -155,7 +168,7 @@ func DeleteFile(fileName string, client pufs_pb.IpfsFileSystemClient, ctx contex
 	return nil
 }
 
-func DownloadCappedFile(fileName, path string, client pufs_pb.IpfsFileSystemClient) error {
+func (c *IpfsClient) DownloadCappedFile(fileName, path string) error {
 	log.Printf("Downloading larger file: %v", fileName)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -163,7 +176,7 @@ func DownloadCappedFile(fileName, path string, client pufs_pb.IpfsFileSystemClie
 
 	req := &pufs_pb.DownloadFileRequest{FileName: fileName}
 
-	download, err := client.DownloadFile(ctx, req)
+	download, err := c.Client.DownloadFile(ctx, req)
 
 	if err != nil {
 		return err
@@ -204,10 +217,13 @@ func DownloadCappedFile(fileName, path string, client pufs_pb.IpfsFileSystemClie
 }
 
 // We must chunk the file here if its over the 4MB limit.
-func DownloadFile(fileName, path string, client pufs_pb.IpfsFileSystemClient, ctx context.Context) error {
-	log.Printf("Downliading file: %v", fileName)
+func (c *IpfsClient) DownloadFile(fileName, path string) error {
+  ctx, cancel := context.WithCancel(context.Background())
+  defer cancel()
 
-	fileResp, err := client.DownloadUncappedFile(ctx, &pufs_pb.DownloadFileRequest{FileName: fileName})
+	log.Printf("Downloading file: %v", fileName)
+
+	fileResp, err := c.Client.DownloadUncappedFile(ctx, &pufs_pb.DownloadFileRequest{FileName: fileName})
 
 	if err != nil {
 		return err
@@ -227,7 +243,10 @@ func DownloadFile(fileName, path string, client pufs_pb.IpfsFileSystemClient, ct
 }
 
 //Uploads a file stream that is under the 4MB gRPC file size cap
-func UploadFileData(ctx context.Context, client pufs_pb.IpfsFileSystemClient, fileData []byte, fileSize int64, fileName string) error {
+func (c *IpfsClient) UploadFileData(fileData []byte, fileSize int64, fileName string) error {
+  ctx, cancel := context.WithCancel(context.Background())
+  defer cancel()
+
 	file := &pufs_pb.File{
 		Filename:   fileName,
 		FileSize:   fileSize,
@@ -238,7 +257,7 @@ func UploadFileData(ctx context.Context, client pufs_pb.IpfsFileSystemClient, fi
 	log.Println("Uploading file")
 
 	request := &pufs_pb.UploadFileRequest{FileData: fileData, FileMetadata: file}
-	resp, err := client.UploadFile(ctx, request)
+	resp, err := c.Client.UploadFile(ctx, request)
 
 	if err != nil {
 		return err
@@ -270,14 +289,12 @@ func PrintFiles(files pufs_pb.IpfsFileSystem_ListFilesClient) {
 
 // Listen for file changes realtime.
 // Take ID and store this upstream.
-func SubscribeFileStream(client pufs_pb.IpfsFileSystemClient, ctx context.Context) {
-	// Call function to remove the client from the subscription when client dies.
-	// Note:  This does NOT run. This would work if the client exited gracefully, however, we do not
-	// This is effectively an endless loop that checks for streams, so the only way to exist is to liste for an os exit event.
-	defer client.UnsubscribeFileStream(ctx, &pufs_pb.FilesRequest{Id: id})
+func (c *IpfsClient) SubscribeFileStream() {
+  ctx, cancel := context.WithCancel(context.Background())
+  defer cancel()
 
 	for {
-		stream, err := client.ListFilesEventStream(ctx, &pufs_pb.FilesRequest{Id: id})
+		stream, err := c.Client.ListFilesEventStream(ctx, &pufs_pb.FilesRequest{Id: c.Id})
 
 		// Retrun on failure
 		if err != nil || stream == nil {
@@ -300,22 +317,30 @@ func SubscribeFileStream(client pufs_pb.IpfsFileSystemClient, ctx context.Contex
 					stream = nil
 					break
 				}
-
+        
+        // Adjust file data here.
 				fmt.Printf("File: %v", file.Files)
 			}
 		}
 	}
 }
 
-func ChunkFile(fileName string, client pufs_pb.IpfsFileSystemClient) bool {
+func (c *IpfsClient) chunkFile(fileName string) bool {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	size, err := client.FileSize(ctx, &pufs_pb.FileSizeRequest{FileName: fileName})
+	size, err := c.Client.FileSize(ctx, &pufs_pb.FileSizeRequest{FileName: fileName})
 
 	if err != nil {
 		log.Printf("Could not get file size. Error: %v", err)
 	}
 
 	return size.FileSize >= (2 << 20)
+}
+
+func (c *IpfsClient) UnsubscribeClient() {
+  ctx, cancel := context.WithCancel(context.Background())
+  defer cancel()
+
+  c.Client.UnsubscribeFileStream(ctx, &pufs_pb.FilesRequest{Id: client.Id})
 }
