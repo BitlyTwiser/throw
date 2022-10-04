@@ -56,8 +56,6 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 			}
 		}
 	}()
-	// Pass the file list widget into the IpfsClient struct. Allowing us to refresh the widget on file upload.
-	client.FileListWidget <- fileList
 
 	content := container.NewBorder(toolbar, nil, nil, nil, fileList)
 
@@ -91,11 +89,10 @@ func main() {
 	c := pufs_pb.NewIpfsFileSystemClient(conn)
 
 	client := pufs_client.IpfsClient{
-		Id:             id,
-		Client:         c,
-		Files:          []string{"One", "Two", "Three"},
-		FileListWidget: make(chan *widget.List, 1),
-		FileUpload:     make(chan string, 1),
+		Id:         id,
+		Client:     c,
+		Files:      []string{"One", "Two", "Three"},
+		FileUpload: make(chan string, 1),
 	}
 	// Remove  client after connection ends
 	defer client.UnsubscribeClient()

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/widget"
 	pufs_pb "github.com/BitlyTwiser/pufs-server/proto"
 	"github.com/BitlyTwiser/tinychunk"
 
@@ -21,11 +20,10 @@ import (
 )
 
 type IpfsClient struct {
-	Id             int64
-	Client         pufs_pb.IpfsFileSystemClient
-	Files          []string
-	FileListWidget chan *widget.List
-	FileUpload     chan string
+	Id         int64
+	Client     pufs_pb.IpfsFileSystemClient
+	Files      []string
+	FileUpload chan string
 }
 type FileData struct {
 	fileSize int64
