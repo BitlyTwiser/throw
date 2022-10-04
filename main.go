@@ -21,13 +21,9 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func initializeUI(w fyne.Window, client pufs_pb.IpfsFileSystemClient) {
-	// Load files here.
-	// Spawn alternate thread to handle the file watching.
-	data := []string{"One", "Two", "Three"}
-
+func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 	toolbar := widget.NewToolbar(
-		widget.NewToolbarAction(theme.DocumentCreateIcon(), func() { toolbar.UploadFile(w) }),
+		widget.NewToolbarAction(theme.DocumentCreateIcon(), func() { toolbar.UploadFile(w, client) }),
 		widget.NewToolbarSeparator(),
 		widget.NewToolbarAction(theme.SettingsIcon(), func() { toolbar.Settings() }),
 		widget.NewToolbarSpacer(),
@@ -35,29 +31,34 @@ func initializeUI(w fyne.Window, client pufs_pb.IpfsFileSystemClient) {
 	)
 
 	fileList := widget.NewList(
-		func() int { return len(data) },
+		func() int { return len(client.Files) },
 		func() fyne.CanvasObject {
 			return container.NewGridWithColumns(3, container.NewPadded(widget.NewLabel("")), container.NewPadded(widget.NewButtonWithIcon("Download", theme.DownloadIcon(), nil)), container.NewPadded(widget.NewButtonWithIcon("Delete", theme.DeleteIcon(), nil)))
 		},
 		func(i widget.ListItemID, o fyne.CanvasObject) {
-			o.(*fyne.Container).Objects[0].(*fyne.Container).Objects[0].(*widget.Label).SetText(fmt.Sprintf("Name: %v", data[i]))
+			o.(*fyne.Container).Objects[0].(*fyne.Container).Objects[0].(*widget.Label).SetText(fmt.Sprintf("Name: %v", client.Files[i]))
 			o.(*fyne.Container).Objects[1].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
-				fmt.Printf("Hello from download. Data: %v", data[i])
+				fmt.Printf("Hello from download. Data: %v", client.Files[i])
 			}
 			o.(*fyne.Container).Objects[2].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
-				fmt.Printf("Hello from delete. Data: %v", data[i])
+				fmt.Printf("Hello from delete. Data: %v", client.Files[i])
 			}
 		},
 	)
 
 	go func() {
-		time.Sleep(time.Second * 5)
-		log.Println("Adding element")
-		data = append(data, "Nine")
-		fileList.Refresh()
+		for {
+			select {
+			case file := <-client.FileUpload:
+				client.Files = append(client.Files, file)
+				log.Println("Refreshing.")
+				fileList.Refresh()
+			}
+		}
 	}()
+	// Pass the file list widget into the IpfsClient struct. Allowing us to refresh the widget on file upload.
+	client.FileListWidget <- fileList
 
-	//c := container.NewMax(fileList)
 	content := container.NewBorder(toolbar, nil, nil, nil, fileList)
 
 	w.SetContent(content)
@@ -70,8 +71,9 @@ func main() {
 	w := a.NewWindow("Filesystem")
 	w.SetMaster()
 	w.Resize(fyne.NewSize(500, 500))
-  
-  //Note: Look to add validation server side that ID is unique.
+
+	rand.Seed(time.Now().UTC().UnixNano())
+	//Note: Look to add validation server side that ID is unique.
 	id = int64(rand.Intn(100))
 
 	// Must load values for address and server port from storage.
@@ -87,15 +89,21 @@ func main() {
 	defer conn.Close()
 
 	c := pufs_pb.NewIpfsFileSystemClient(conn)
-  
-  client := pufs_client.IpfsClient{Id: id, Client: c}
-  // Remove  client after connection ends
+
+	client := pufs_client.IpfsClient{
+		Id:             id,
+		Client:         c,
+		Files:          []string{"One", "Two", "Three"},
+		FileListWidget: make(chan *widget.List, 1),
+		FileUpload:     make(chan string, 1),
+	}
+	// Remove  client after connection ends
 	defer client.UnsubscribeClient()
 
-  go client.SubscribeFileStream()
-  
-  // Initialize the UI elements.
-	initializeUI(w, c)
+	// Initialize the UI elements.
+	initializeUI(w, client)
+
+	go client.SubscribeFileStream()
 
 	w.ShowAndRun()
 }

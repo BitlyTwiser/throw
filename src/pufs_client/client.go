@@ -1,4 +1,4 @@
-package pufs_client 
+package pufs_client
 
 import (
 	"context"
@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/widget"
 	pufs_pb "github.com/BitlyTwiser/pufs-server/proto"
 	"github.com/BitlyTwiser/tinychunk"
 
@@ -19,13 +21,15 @@ import (
 )
 
 type IpfsClient struct {
-  Id int64
-  Client pufs_pb.IpfsFileSystemClient
+	Id             int64
+	Client         pufs_pb.IpfsFileSystemClient
+	Files          []string
+	FileListWidget chan *widget.List
+	FileUpload     chan string
 }
-
 type FileData struct {
-  fileSize int64
-  fileName string
+	fileSize int64
+	fileName string
 }
 
 func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileName string) error {
@@ -100,14 +104,14 @@ func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileNam
 	if resp.GetSucessful() {
 		log.Println("File has been uploaded")
 	} else {
-		return errors.New("Server did not say successful")
+		return errors.New("server did not say successful")
 	}
 
 	return nil
 }
 
 func (c *IpfsClient) UploadFile(path, fileName string) error {
-	file, err := os.OpenFile(fmt.Sprintf("%v%v", path, fileName), os.O_RDONLY, 0400)
+	file, err := os.OpenFile(path, os.O_RDONLY, 0400)
 
 	if err != nil {
 		return err
@@ -150,8 +154,8 @@ func (c *IpfsClient) UploadFile(path, fileName string) error {
 }
 
 func (c *IpfsClient) DeleteFile(fileName string) error {
-  ctx, cancel := context.WithCancel(context.Background())
-  defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	resp, err := c.Client.DeleteFile(ctx, &pufs_pb.DeleteFileRequest{FileName: fileName})
 
@@ -162,7 +166,7 @@ func (c *IpfsClient) DeleteFile(fileName string) error {
 	if resp.Successful {
 		log.Println("File deleted")
 	} else {
-		return errors.New(fmt.Sprintf("Error occured deleting file: %v", resp))
+		return fmt.Errorf("error occured deleting file: %v", resp)
 	}
 
 	return nil
@@ -209,7 +213,7 @@ func (c *IpfsClient) DownloadCappedFile(fileName, path string) error {
 		}
 
 		if n == 0 {
-			return errors.New("No bytes were written to file!")
+			return errors.New("no bytes were written to file")
 		}
 	}
 
@@ -218,8 +222,8 @@ func (c *IpfsClient) DownloadCappedFile(fileName, path string) error {
 
 // We must chunk the file here if its over the 4MB limit.
 func (c *IpfsClient) DownloadFile(fileName, path string) error {
-  ctx, cancel := context.WithCancel(context.Background())
-  defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	log.Printf("Downloading file: %v", fileName)
 
@@ -244,8 +248,8 @@ func (c *IpfsClient) DownloadFile(fileName, path string) error {
 
 //Uploads a file stream that is under the 4MB gRPC file size cap
 func (c *IpfsClient) UploadFileData(fileData []byte, fileSize int64, fileName string) error {
-  ctx, cancel := context.WithCancel(context.Background())
-  defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	file := &pufs_pb.File{
 		Filename:   fileName,
@@ -264,15 +268,26 @@ func (c *IpfsClient) UploadFileData(fileData []byte, fileSize int64, fileName st
 	}
 
 	if !resp.Sucessful {
-		return errors.New("Something went wrong uploading file.")
+		return errors.New("something went wrong uploading file")
 	}
 
 	return nil
 }
 
-func PrintFiles(files pufs_pb.IpfsFileSystem_ListFilesClient) {
+// Load files upon client start.
+func (c *IpfsClient) LoadFiles() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	req, err := c.Client.ListFiles(ctx, &pufs_pb.FilesRequest{})
+
+	if err != nil {
+		fyne.NewNotification("Error", fmt.Sprintf("Error loading files from server. Error: %v", err))
+		return
+	}
+
 	for {
-		file, err := files.Recv()
+		file, err := req.Recv()
 
 		if err == io.EOF {
 			break
@@ -290,38 +305,33 @@ func PrintFiles(files pufs_pb.IpfsFileSystem_ListFilesClient) {
 // Listen for file changes realtime.
 // Take ID and store this upstream.
 func (c *IpfsClient) SubscribeFileStream() {
-  ctx, cancel := context.WithCancel(context.Background())
-  defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	for {
 		stream, err := c.Client.ListFilesEventStream(ctx, &pufs_pb.FilesRequest{Id: c.Id})
 
-		// Retrun on failure
 		if err != nil || stream == nil {
 			log.Println("Error or stream not empty, waiting for 5 seconds")
 			time.Sleep(time.Second * 5)
 
 			continue
 		} else {
-			for {
-				file, err := stream.Recv()
+			file, err := stream.Recv()
 
-				if err == io.EOF {
-					log.Println("All files read, awaiting..")
-					stream = nil
-					break
-				}
-
-				if err != nil {
-					log.Println("error encrountered, retrying..")
-					stream = nil
-					break
-				}
-        
-        // Adjust file data here.
-				fmt.Printf("File: %v", file.Files)
-        fmt.Println("I am here")
+			if err == io.EOF {
+				log.Println("All files read, awaiting..")
+				stream = nil
+				break
 			}
+
+			if err != nil {
+				log.Println("error encountered, retrying..")
+				stream = nil
+				break
+			}
+			log.Printf("Pushing file.. Filename: %v", file.Files.Filename)
+			c.FileUpload <- file.Files.Filename
 		}
 	}
 }
@@ -340,8 +350,8 @@ func (c *IpfsClient) chunkFile(fileName string) bool {
 }
 
 func (c *IpfsClient) UnsubscribeClient() {
-  ctx, cancel := context.WithCancel(context.Background())
-  defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-  c.Client.UnsubscribeFileStream(ctx, &pufs_pb.FilesRequest{Id: c.Id})
+	c.Client.UnsubscribeFileStream(ctx, &pufs_pb.FilesRequest{Id: c.Id})
 }
