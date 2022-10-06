@@ -9,6 +9,7 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 	"github.com/BitlyTwiser/throw/src/pufs_client"
+	"github.com/BitlyTwiser/throw/src/settings"
 )
 
 func UploadFile(window fyne.Window, client pufs_client.IpfsClient) {
@@ -64,10 +65,9 @@ func Settings() {
 	form := &widget.Form{
 		Items: []*widget.FormItem{},
 		OnSubmit: func() {
-			log.Println("Form submitted")
+			settings.SaveSettings()
 		},
 		OnCancel: func() {
-			log.Println("Close Form")
 			settingsWindow.Close()
 		},
 	}
@@ -77,8 +77,22 @@ func Settings() {
 	port := widget.NewEntry()
 	port.SetPlaceHolder("Enter Host Port...")
 
+	password := widget.NewPasswordEntry()
+	password.SetPlaceHolder("Set encryption password")
+
+	checkBox := widget.NewCheck("", func(changed bool) {
+		if changed {
+			password.Enable()
+		} else {
+			password.Disable()
+		}
+	})
+
+	// Append form elements
 	form.Append("Host Address", host)
 	form.Append("Host Port", port)
+	form.Append("Encrypt Files", checkBox)
+	form.Append("Encryption Password", password)
 
 	settingsWindow.SetContent(form)
 
