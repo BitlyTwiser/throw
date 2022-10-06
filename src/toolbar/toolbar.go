@@ -7,6 +7,7 @@ import (
 
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/BitlyTwiser/throw/src/pufs_client"
 	"github.com/BitlyTwiser/throw/src/settings"
@@ -58,27 +59,32 @@ func HelpWindow() {
 }
 
 func Settings() {
+	var downloadPath string
 	settingsWindow := fyne.CurrentApp().NewWindow("Settings")
 
 	settingsWindow.Resize(fyne.NewSize(400, 400))
 
-	form := &widget.Form{
-		Items: []*widget.FormItem{},
-		OnSubmit: func() {
-			settings.SaveSettings()
-		},
-		OnCancel: func() {
-			settingsWindow.Close()
-		},
-	}
-
 	host := widget.NewEntry()
 	host.SetPlaceHolder("Enter Host Address...")
+
 	port := widget.NewEntry()
 	port.SetPlaceHolder("Enter Host Port...")
 
 	password := widget.NewPasswordEntry()
-	password.SetPlaceHolder("Set encryption password")
+	password.SetPlaceHolder("password...")
+
+	downloadFolder := dialog.NewFolderOpen(func(f fyne.ListableURI, _ error) {
+		if f == nil {
+			return
+		}
+
+		downloadPath = f.Path()
+
+		log.Println(f.Path())
+	}, settingsWindow)
+
+	button := widget.NewButtonWithIcon("Download Path", theme.FolderIcon(), nil)
+	button.OnTapped = func() { downloadFolder.Show() }
 
 	checkBox := widget.NewCheck("", func(changed bool) {
 		if changed {
@@ -88,11 +94,30 @@ func Settings() {
 		}
 	})
 
+	form := &widget.Form{
+		Items: []*widget.FormItem{},
+		OnSubmit: func() {
+			s := settings.Settings{
+				Host:         host.Text,
+				Port:         port.Text,
+				Encrypted:    checkBox.Checked,
+				Password:     password.Text,
+				DownloadPath: downloadPath,
+			}
+
+			settings.SaveSettings(s)
+		},
+		OnCancel: func() {
+			settingsWindow.Close()
+		},
+	}
+
 	// Append form elements
 	form.Append("Host Address", host)
 	form.Append("Host Port", port)
 	form.Append("Encrypt Files", checkBox)
 	form.Append("Encryption Password", password)
+	form.Append("File Download Path", button)
 
 	settingsWindow.SetContent(form)
 
