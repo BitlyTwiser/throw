@@ -33,15 +33,41 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 	fileList := widget.NewList(
 		func() int { return len(client.Files) },
 		func() fyne.CanvasObject {
-			return container.NewGridWithColumns(3, container.NewPadded(widget.NewLabel("")), container.NewPadded(widget.NewButtonWithIcon("Download", theme.DownloadIcon(), nil)), container.NewPadded(widget.NewButtonWithIcon("Delete", theme.DeleteIcon(), nil)))
+			return container.NewGridWithColumns(3, container.NewPadded(widget.NewLabel("")), container.NewPadded(widget.NewButtonWithIcon("Delete", theme.DownloadIcon(), nil)), container.NewPadded(widget.NewButtonWithIcon("Download", theme.DeleteIcon(), nil)))
 		},
 		func(i widget.ListItemID, o fyne.CanvasObject) {
 			o.(*fyne.Container).Objects[0].(*fyne.Container).Objects[0].(*widget.Label).SetText(fmt.Sprintf("Name: %v", client.Files[i]))
 			o.(*fyne.Container).Objects[1].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
-				fmt.Printf("Hello from download. Data: %v", client.Files[i])
+				var message *fyne.Notification
+				fileName := client.Files[i]
+				err := client.DeleteFile(fileName)
+
+				if err != nil {
+					message = fyne.NewNotification("Error", fmt.Sprintf("Error deleting file: %v", fileName))
+				} else {
+					message = fyne.NewNotification("Success", fmt.Sprintf("File %v delete", fileName))
+				}
+
+				fyne.CurrentApp().SendNotification(message)
 			}
 			o.(*fyne.Container).Objects[2].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
-				fmt.Printf("Hello from delete. Data: %v", client.Files[i])
+				var message *fyne.Notification
+				fileName := client.Files[i]
+				var err error
+
+				if client.ChunkFile(fileName) {
+					err = client.DownloadCappedFile(fileName, client.FileDownloadPath)
+				} else {
+					err = client.DownloadFile(fileName, client.FileDownloadPath)
+				}
+
+				if err != nil {
+					message = fyne.NewNotification("Error", fmt.Sprintf("Error downloading file: %v", fileName))
+				} else {
+					message = fyne.NewNotification("Success", fmt.Sprintf("File %v downloaded", fileName))
+				}
+
+				fyne.CurrentApp().SendNotification(message)
 			}
 		},
 	)
@@ -52,6 +78,14 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 			case file := <-client.FileUpload:
 				client.Files = append(client.Files, file)
 				log.Println("Refreshing.")
+				fileList.Refresh()
+			case file := <-client.DeletedFile:
+				for i, v := range client.Files {
+					if v == file {
+						client.Files = append(client.Files[:i], client.Files[i+1:]...)
+					}
+				}
+				log.Println("Refreshing after deleting file.")
 				fileList.Refresh()
 			}
 		}
@@ -89,13 +123,19 @@ func main() {
 	c := pufs_pb.NewIpfsFileSystemClient(conn)
 
 	client := pufs_client.IpfsClient{
-		Id:         id,
-		Client:     c,
-		Files:      []string{"One", "Two", "Three"},
-		FileUpload: make(chan string, 1),
+		Id:               id,
+		Client:           c,
+		Files:            []string{},
+		FileUpload:       make(chan string, 1),
+		DeletedFile:      make(chan string, 1),
+		FileDeleted:      make(chan bool, 1),
+		FileDownloadPath: "/tmp",
 	}
 	// Remove  client after connection ends
 	defer client.UnsubscribeClient()
+
+	// Load existing files from server on application start
+	client.LoadFiles()
 
 	// Initialize the UI elements.
 	initializeUI(w, client)

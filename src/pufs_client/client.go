@@ -20,14 +20,13 @@ import (
 )
 
 type IpfsClient struct {
-	Id         int64
-	Client     pufs_pb.IpfsFileSystemClient
-	Files      []string
-	FileUpload chan string
-}
-type FileData struct {
-	fileSize int64
-	fileName string
+	Id               int64
+	Client           pufs_pb.IpfsFileSystemClient
+	Files            []string
+	FileUpload       chan string
+	DeletedFile      chan string
+	FileDeleted      chan bool
+	FileDownloadPath string
 }
 
 func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileName string) error {
@@ -167,6 +166,10 @@ func (c *IpfsClient) DeleteFile(fileName string) error {
 		return fmt.Errorf("error occured deleting file: %v", resp)
 	}
 
+	// Push onto a different channel for refreshing files.
+	c.DeletedFile <- fileName
+	c.FileDeleted <- true
+
 	return nil
 }
 
@@ -281,6 +284,7 @@ func (c *IpfsClient) LoadFiles() {
 
 	if err != nil {
 		fyne.NewNotification("Error", fmt.Sprintf("Error loading files from server. Error: %v", err))
+
 		return
 	}
 
@@ -296,7 +300,7 @@ func (c *IpfsClient) LoadFiles() {
 			break
 		}
 
-		fmt.Printf("File: %v", file.Files)
+		c.Files = append(c.Files, file.Files.Filename)
 	}
 }
 
@@ -329,12 +333,17 @@ func (c *IpfsClient) SubscribeFileStream() {
 				break
 			}
 			log.Printf("Pushing file.. Filename: %v", file.Files.Filename)
-			c.FileUpload <- file.Files.Filename
+
+			if len(c.FileDeleted) == 0 {
+				c.FileUpload <- file.Files.Filename
+			} else {
+				<-c.FileDeleted
+			}
 		}
 	}
 }
 
-func (c *IpfsClient) chunkFile(fileName string) bool {
+func (c *IpfsClient) ChunkFile(fileName string) bool {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
