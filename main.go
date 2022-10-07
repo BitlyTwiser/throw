@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/BitlyTwiser/throw/src/pufs_client"
+	"github.com/BitlyTwiser/throw/src/settings"
 	"github.com/BitlyTwiser/throw/src/toolbar"
 
 	pufs_pb "github.com/BitlyTwiser/pufs-server/proto"
@@ -24,7 +25,7 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 	toolbar := widget.NewToolbar(
 		widget.NewToolbarAction(theme.DocumentCreateIcon(), func() { toolbar.UploadFile(w, client) }),
 		widget.NewToolbarSeparator(),
-		widget.NewToolbarAction(theme.SettingsIcon(), func() { toolbar.Settings() }),
+		widget.NewToolbarAction(theme.SettingsIcon(), func() { toolbar.Settings(&client.Settings) }),
 		widget.NewToolbarSpacer(),
 		widget.NewToolbarAction(theme.HelpIcon(), func() { toolbar.HelpWindow() }),
 	)
@@ -55,9 +56,9 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 				var err error
 
 				if client.ChunkFile(fileName) {
-					err = client.DownloadCappedFile(fileName, client.FileDownloadPath)
+					err = client.DownloadCappedFile(fileName, client.Settings.DownloadPath)
 				} else {
-					err = client.DownloadFile(fileName, client.FileDownloadPath)
+					err = client.DownloadFile(fileName, client.Settings.DownloadPath)
 				}
 
 				if err != nil {
@@ -121,14 +122,17 @@ func main() {
 
 	c := pufs_pb.NewIpfsFileSystemClient(conn)
 
+	// Craft settings struct and load
+	s := settings.LoadSettings()
+
 	client := pufs_client.IpfsClient{
-		Id:               id,
-		Client:           c,
-		Files:            []string{},
-		FileUpload:       make(chan string, 1),
-		DeletedFile:      make(chan string, 1),
-		FileDeleted:      make(chan bool, 1),
-		FileDownloadPath: "/tmp",
+		Id:          id,
+		Client:      c,
+		Files:       []string{},
+		FileUpload:  make(chan string, 1),
+		DeletedFile: make(chan string, 1),
+		FileDeleted: make(chan bool, 1),
+		Settings:    s.CurrentSettings(),
 	}
 	// Remove  client after connection ends
 	defer client.UnsubscribeClient()

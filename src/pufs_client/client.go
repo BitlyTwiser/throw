@@ -13,6 +13,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	pufs_pb "github.com/BitlyTwiser/pufs-server/proto"
+	"github.com/BitlyTwiser/throw/src/settings"
 	"github.com/BitlyTwiser/tinychunk"
 
 	//	"github.com/BitlyTwiser/tinycrypt"
@@ -20,13 +21,13 @@ import (
 )
 
 type IpfsClient struct {
-	Id               int64
-	Client           pufs_pb.IpfsFileSystemClient
-	Files            []string
-	FileUpload       chan string
-	DeletedFile      chan string
-	FileDeleted      chan bool
-	FileDownloadPath string
+	Id          int64
+	Client      pufs_pb.IpfsFileSystemClient
+	Files       []string
+	FileUpload  chan string
+	DeletedFile chan string
+	FileDeleted chan bool
+	Settings    settings.Settings
 }
 
 func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileName string) error {

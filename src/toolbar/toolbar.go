@@ -58,7 +58,7 @@ func HelpWindow() {
 	helpWindow.Show()
 }
 
-func Settings() {
+func Settings(s *settings.Settings) {
 	var downloadPath string
 	settingsWindow := fyne.CurrentApp().NewWindow("Settings")
 
@@ -79,8 +79,6 @@ func Settings() {
 		}
 
 		downloadPath = f.Path()
-
-		log.Println(f.Path())
 	}, settingsWindow)
 
 	button := widget.NewButtonWithIcon("Download Path", theme.FolderIcon(), nil)
@@ -97,7 +95,7 @@ func Settings() {
 	form := &widget.Form{
 		Items: []*widget.FormItem{},
 		OnSubmit: func() {
-			s := settings.Settings{
+			newSettings := settings.Settings{
 				Host:         host.Text,
 				Port:         port.Text,
 				Encrypted:    checkBox.Checked,
@@ -105,7 +103,7 @@ func Settings() {
 				DownloadPath: downloadPath,
 			}
 
-			settings.SaveSettings(s)
+			s.SaveSettings(newSettings)
 		},
 		OnCancel: func() {
 			settingsWindow.Close()
