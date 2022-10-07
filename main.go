@@ -106,9 +106,9 @@ func main() {
 	//Note: Look to add validation server side that ID is unique.
 	id = int64(rand.Intn(100))
 
-	// Must load values for address and server port from storage.
-	// The settings page will store these values.
-	conn, err := grpc.Dial(fmt.Sprintf("%v:%v", "127.0.0.1", 9000), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	s := settings.LoadSettings()
+
+	conn, err := grpc.Dial(fmt.Sprintf("%v:%v", s.Host, s.Port), grpc.WithTransportCredentials(insecure.NewCredentials()))
 
 	if err != nil {
 		log.Fatalf("Error connection to server: %v", err)
@@ -127,7 +127,7 @@ func main() {
 		FileUpload:  make(chan string, 1),
 		DeletedFile: make(chan string, 1),
 		FileDeleted: make(chan bool, 1),
-		Settings:    settings.LoadSettings(),
+		Settings:    s,
 	}
 	// Remove  client after connection ends
 	defer client.UnsubscribeClient()
