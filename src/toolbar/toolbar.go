@@ -58,6 +58,8 @@ func HelpWindow() {
 	helpWindow.Show()
 }
 
+// Set the values from the settings on load
+// host.SetText(s.Host) if s.Host != nil
 func Settings(s *settings.Settings) {
 	var downloadPath string
 	settingsWindow := fyne.CurrentApp().NewWindow("Settings")
@@ -65,12 +67,21 @@ func Settings(s *settings.Settings) {
 	settingsWindow.Resize(fyne.NewSize(400, 400))
 
 	host := widget.NewEntry()
+	if s.Host != "" {
+		host.SetText(s.Host)
+	}
 	host.SetPlaceHolder("Enter Host Address...")
 
 	port := widget.NewEntry()
+	if s.Port != "" {
+		port.SetText(s.Port)
+	}
 	port.SetPlaceHolder("Enter Host Port...")
 
 	password := widget.NewPasswordEntry()
+	if s.Password != "" {
+		password.SetText(s.Password)
+	}
 	password.SetPlaceHolder("password...")
 
 	downloadFolder := dialog.NewFolderOpen(func(f fyne.ListableURI, _ error) {
@@ -84,6 +95,9 @@ func Settings(s *settings.Settings) {
 	button := widget.NewButtonWithIcon("Download Path", theme.FolderIcon(), nil)
 	button.OnTapped = func() { downloadFolder.Show() }
 
+	if s.Encrypted {
+		password.Enable()
+	}
 	checkBox := widget.NewCheck("", func(changed bool) {
 		if changed {
 			password.Enable()
