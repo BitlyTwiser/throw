@@ -2,9 +2,14 @@ package settings
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
+
+	"fyne.io/fyne/v2"
 )
+
+const settingsFilePath string = "../../settings.json"
 
 type Settings struct {
 	Host         string
@@ -22,6 +27,27 @@ func (s *Settings) SaveSettings(settings Settings) bool {
 	// See if this works
 	s = &settings
 
+	file, err := os.OpenFile(settingsFilePath, os.O_TRUNC|os.O_RDWR, 0600)
+
+	if err != nil {
+		notification := fyne.NewNotification("Error", fmt.Sprintf("error saving settings. Error: %v", err))
+		fyne.CurrentApp().SendNotification(notification)
+	}
+
+	j, err := json.MarshalIndent(&settings, "", "")
+
+	if err != nil {
+		notification := fyne.NewNotification("Error", fmt.Sprintf("error saving settings. Error: %v", err))
+		fyne.CurrentApp().SendNotification(notification)
+	}
+
+	_, err = file.Write(j)
+
+	if err != nil {
+		notification := fyne.NewNotification("Error", fmt.Sprintf("error writing settings to file. Error: %v", err))
+		fyne.CurrentApp().SendNotification(notification)
+	}
+
 	return true
 }
 
@@ -29,13 +55,13 @@ func (s *Settings) SaveSettings(settings Settings) bool {
 func LoadSettings() *Settings {
 	log.Println("Loading settings")
 	s := &Settings{}
-	var settingsFilePath string = "../../settings.json"
 
 	if _, err := os.Stat(settingsFilePath); os.IsNotExist(err) {
 		file, err := os.OpenFile(settingsFilePath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
 
 		if err != nil {
-			log.Println("Error loading settings..")
+			notification := fyne.NewNotification("Error", fmt.Sprintf("error loading settings. Error: %v", err))
+			fyne.CurrentApp().SendNotification(notification)
 		}
 
 		defer file.Close()
@@ -43,13 +69,15 @@ func LoadSettings() *Settings {
 		j, err := json.MarshalIndent(Settings{}, "", "")
 
 		if err != nil {
-			log.Printf("error storing settings file content. Error: %v", err)
+			notification := fyne.NewNotification("Error", fmt.Sprintf("error loading settings. Error: %v", err))
+			fyne.CurrentApp().SendNotification(notification)
 		}
 
 		n, err := file.Write(j)
 
 		if n == 0 || err != nil {
-			log.Println("Zero bytes written to settings file or there was an error")
+			notification := fyne.NewNotification("Error", "Zero bytes written or error")
+			fyne.CurrentApp().SendNotification(notification)
 		}
 
 		// At the end of it all, we return empty settings after making the file
