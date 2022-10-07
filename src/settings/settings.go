@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"fyne.io/fyne/v2"
+	"github.com/BitlyTwiser/throw/src/notifications"
 )
 
 const settingsFilePath string = "../../settings.json"
@@ -24,31 +24,31 @@ func (s Settings) CurrentSettings() Settings {
 }
 
 func (s *Settings) SaveSettings(settings Settings) bool {
-	// See if this works
-	s = &settings
+	s.SaveSettingsMemory(&settings)
 
 	file, err := os.OpenFile(settingsFilePath, os.O_TRUNC|os.O_RDWR, 0600)
 
 	if err != nil {
-		notification := fyne.NewNotification("Error", fmt.Sprintf("error saving settings. Error: %v", err))
-		fyne.CurrentApp().SendNotification(notification)
+		notifications.SendErrorNotification(fmt.Sprintf("error saving settings. Error: %v", err))
 	}
 
 	j, err := json.MarshalIndent(&settings, "", "")
 
 	if err != nil {
-		notification := fyne.NewNotification("Error", fmt.Sprintf("error saving settings. Error: %v", err))
-		fyne.CurrentApp().SendNotification(notification)
+		notifications.SendErrorNotification(fmt.Sprintf("error saving settings. Error: %v", err))
 	}
 
 	_, err = file.Write(j)
 
 	if err != nil {
-		notification := fyne.NewNotification("Error", fmt.Sprintf("error writing settings to file. Error: %v", err))
-		fyne.CurrentApp().SendNotification(notification)
+		notifications.SendErrorNotification(fmt.Sprintf("error writing settings to file. Error: %v", err))
 	}
 
 	return true
+}
+
+func (s *Settings) SaveSettingsMemory(settings *Settings) {
+	*s = *settings
 }
 
 // Load settings from file.
@@ -60,8 +60,7 @@ func LoadSettings() *Settings {
 		file, err := os.OpenFile(settingsFilePath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
 
 		if err != nil {
-			notification := fyne.NewNotification("Error", fmt.Sprintf("error loading settings. Error: %v", err))
-			fyne.CurrentApp().SendNotification(notification)
+			notifications.SendErrorNotification(fmt.Sprintf("error loading settings. Error: %v", err))
 		}
 
 		defer file.Close()
@@ -69,15 +68,13 @@ func LoadSettings() *Settings {
 		j, err := json.MarshalIndent(Settings{}, "", "")
 
 		if err != nil {
-			notification := fyne.NewNotification("Error", fmt.Sprintf("error loading settings. Error: %v", err))
-			fyne.CurrentApp().SendNotification(notification)
+			notifications.SendErrorNotification(fmt.Sprintf("error loading settings. Error: %v", err))
 		}
 
 		n, err := file.Write(j)
 
 		if n == 0 || err != nil {
-			notification := fyne.NewNotification("Error", "Zero bytes written or error")
-			fyne.CurrentApp().SendNotification(notification)
+			notifications.SendErrorNotification("Zero bytes written or error")
 		}
 
 		// At the end of it all, we return empty settings after making the file

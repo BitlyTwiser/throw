@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/BitlyTwiser/throw/src/notifications"
 	"github.com/BitlyTwiser/throw/src/pufs_client"
 	"github.com/BitlyTwiser/throw/src/settings"
 	"github.com/BitlyTwiser/throw/src/toolbar"
@@ -25,7 +26,7 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 	toolbar := widget.NewToolbar(
 		widget.NewToolbarAction(theme.DocumentCreateIcon(), func() { toolbar.UploadFile(w, client) }),
 		widget.NewToolbarSeparator(),
-		widget.NewToolbarAction(theme.SettingsIcon(), func() { toolbar.Settings(&client.Settings) }),
+		widget.NewToolbarAction(theme.SettingsIcon(), func() { toolbar.Settings(client.Settings) }),
 		widget.NewToolbarSpacer(),
 		widget.NewToolbarAction(theme.HelpIcon(), func() { toolbar.HelpWindow() }),
 	)
@@ -51,7 +52,6 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 				fyne.CurrentApp().SendNotification(message)
 			}
 			o.(*fyne.Container).Objects[2].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
-				var message *fyne.Notification
 				fileName := client.Files[i]
 				var err error
 
@@ -62,12 +62,10 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 				}
 
 				if err != nil {
-					message = fyne.NewNotification("Error", fmt.Sprintf("Error downloading file: %v", fileName))
+					notifications.SendErrorNotification(fmt.Sprintf("Error downloading file: %v", fileName))
 				} else {
-					message = fyne.NewNotification("Success", fmt.Sprintf("File %v downloaded", fileName))
+					notifications.SendSuccessNotification(fmt.Sprintf("File %v downloaded", fileName))
 				}
-
-				fyne.CurrentApp().SendNotification(message)
 			}
 		},
 	)
@@ -122,9 +120,6 @@ func main() {
 
 	c := pufs_pb.NewIpfsFileSystemClient(conn)
 
-	// Craft settings struct and load
-	s := settings.LoadSettings()
-
 	client := pufs_client.IpfsClient{
 		Id:          id,
 		Client:      c,
@@ -132,7 +127,7 @@ func main() {
 		FileUpload:  make(chan string, 1),
 		DeletedFile: make(chan string, 1),
 		FileDeleted: make(chan bool, 1),
-		Settings:    s.CurrentSettings(),
+		Settings:    settings.LoadSettings(),
 	}
 	// Remove  client after connection ends
 	defer client.UnsubscribeClient()

@@ -1,6 +1,7 @@
 package toolbar
 
 import (
+	"fmt"
 	"log"
 
 	"fyne.io/fyne/v2"
@@ -9,6 +10,7 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/BitlyTwiser/throw/src/notifications"
 	"github.com/BitlyTwiser/throw/src/pufs_client"
 	"github.com/BitlyTwiser/throw/src/settings"
 )
@@ -24,8 +26,7 @@ func UploadFile(window fyne.Window, client pufs_client.IpfsClient) {
 		err := client.UploadFile(f.URI().Path(), f.URI().Name())
 
 		if err != nil {
-			errorNotification := fyne.NewNotification("Error", "Error uploading File")
-			fyne.CurrentApp().SendNotification(errorNotification)
+			notifications.SendErrorNotification(fmt.Sprintf("Error uploading File. Error: %v", err))
 
 			return
 		}
@@ -59,7 +60,6 @@ func HelpWindow() {
 }
 
 // Set the values from the settings on load
-// host.SetText(s.Host) if s.Host != nil
 func Settings(s *settings.Settings) {
 	var downloadPath string
 	settingsWindow := fyne.CurrentApp().NewWindow("Settings")
@@ -97,6 +97,8 @@ func Settings(s *settings.Settings) {
 
 	if s.Encrypted {
 		password.Enable()
+	} else {
+		password.Disable()
 	}
 	checkBox := widget.NewCheck("", func(changed bool) {
 		if changed {
@@ -117,7 +119,14 @@ func Settings(s *settings.Settings) {
 				DownloadPath: downloadPath,
 			}
 
-			s.SaveSettings(newSettings)
+			saved := s.SaveSettings(newSettings)
+
+			if saved {
+				notifications.SendSuccessNotification("Settings saved")
+				settingsWindow.Close()
+			} else {
+				notifications.SendErrorNotification("Error saving settings")
+			}
 		},
 		OnCancel: func() {
 			settingsWindow.Close()

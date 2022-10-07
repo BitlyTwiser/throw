@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"fyne.io/fyne/v2"
 	pufs_pb "github.com/BitlyTwiser/pufs-server/proto"
+	"github.com/BitlyTwiser/throw/src/notifications"
 	"github.com/BitlyTwiser/throw/src/settings"
 	"github.com/BitlyTwiser/tinychunk"
 
@@ -27,7 +27,7 @@ type IpfsClient struct {
 	FileUpload  chan string
 	DeletedFile chan string
 	FileDeleted chan bool
-	Settings    settings.Settings
+	Settings    *settings.Settings
 }
 
 func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileName string) error {
@@ -147,6 +147,7 @@ func (c *IpfsClient) UploadFile(path, fileName string) error {
 			return err
 		}
 	}
+	notifications.SendSuccessNotification("File uploaded")
 
 	return nil
 }
@@ -162,7 +163,7 @@ func (c *IpfsClient) DeleteFile(fileName string) error {
 	}
 
 	if resp.Successful {
-		log.Println("File deleted")
+		notifications.SendSuccessNotification("File Deleted")
 	} else {
 		return fmt.Errorf("error occured deleting file: %v", resp)
 	}
@@ -245,6 +246,8 @@ func (c *IpfsClient) DownloadFile(fileName, path string) error {
 		return err
 	}
 
+	notifications.SendSuccessNotification("File Downloaded")
+
 	return nil
 }
 
@@ -284,7 +287,7 @@ func (c *IpfsClient) LoadFiles() {
 	req, err := c.Client.ListFiles(ctx, &pufs_pb.FilesRequest{})
 
 	if err != nil {
-		fyne.NewNotification("Error", fmt.Sprintf("Error loading files from server. Error: %v", err))
+		notifications.SendErrorNotification(fmt.Sprintf("Error loading files from server. Error: %v", err))
 
 		return
 	}
