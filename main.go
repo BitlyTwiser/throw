@@ -6,13 +6,14 @@ import (
 	"math/rand"
 	"time"
 
-	// "context"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/BitlyTwiser/throw/src/notifications"
 	"github.com/BitlyTwiser/throw/src/pufs_client"
+	"github.com/BitlyTwiser/throw/src/settings"
 	"github.com/BitlyTwiser/throw/src/toolbar"
 
 	pufs_pb "github.com/BitlyTwiser/pufs-server/proto"
@@ -25,7 +26,7 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 	toolbar := widget.NewToolbar(
 		widget.NewToolbarAction(theme.DocumentCreateIcon(), func() { toolbar.UploadFile(w, client) }),
 		widget.NewToolbarSeparator(),
-		widget.NewToolbarAction(theme.SettingsIcon(), func() { toolbar.Settings() }),
+		widget.NewToolbarAction(theme.SettingsIcon(), func() { toolbar.Settings(client.Settings) }),
 		widget.NewToolbarSpacer(),
 		widget.NewToolbarAction(theme.HelpIcon(), func() { toolbar.HelpWindow() }),
 	)
@@ -51,23 +52,20 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 				fyne.CurrentApp().SendNotification(message)
 			}
 			o.(*fyne.Container).Objects[2].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
-				var message *fyne.Notification
 				fileName := client.Files[i]
 				var err error
 
 				if client.ChunkFile(fileName) {
-					err = client.DownloadCappedFile(fileName, client.FileDownloadPath)
+					err = client.DownloadCappedFile(fileName, client.Settings.DownloadPath)
 				} else {
-					err = client.DownloadFile(fileName, client.FileDownloadPath)
+					err = client.DownloadFile(fileName, client.Settings.DownloadPath)
 				}
 
 				if err != nil {
-					message = fyne.NewNotification("Error", fmt.Sprintf("Error downloading file: %v", fileName))
+					notifications.SendErrorNotification(fmt.Sprintf("Error downloading file: %v", fileName))
 				} else {
-					message = fyne.NewNotification("Success", fmt.Sprintf("File %v downloaded", fileName))
+					notifications.SendSuccessNotification(fmt.Sprintf("File %v downloaded", fileName))
 				}
-
-				fyne.CurrentApp().SendNotification(message)
 			}
 		},
 	)
@@ -100,7 +98,7 @@ var id int64
 
 func main() {
 	a := app.New()
-	w := a.NewWindow("Filesystem")
+	w := a.NewWindow("Throw")
 	w.SetMaster()
 	w.Resize(fyne.NewSize(500, 500))
 
@@ -108,9 +106,9 @@ func main() {
 	//Note: Look to add validation server side that ID is unique.
 	id = int64(rand.Intn(100))
 
-	// Must load values for address and server port from storage.
-	// The settings page will store these values.
-	conn, err := grpc.Dial(fmt.Sprintf("%v:%v", "127.0.0.1", 9000), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	s := settings.LoadSettings()
+
+	conn, err := grpc.Dial(fmt.Sprintf("%v:%v", s.Host, s.Port), grpc.WithTransportCredentials(insecure.NewCredentials()))
 
 	if err != nil {
 		log.Fatalf("Error connection to server: %v", err)
@@ -123,13 +121,13 @@ func main() {
 	c := pufs_pb.NewIpfsFileSystemClient(conn)
 
 	client := pufs_client.IpfsClient{
-		Id:               id,
-		Client:           c,
-		Files:            []string{},
-		FileUpload:       make(chan string, 1),
-		DeletedFile:      make(chan string, 1),
-		FileDeleted:      make(chan bool, 1),
-		FileDownloadPath: "/tmp",
+		Id:          id,
+		Client:      c,
+		Files:       []string{},
+		FileUpload:  make(chan string, 1),
+		DeletedFile: make(chan string, 1),
+		FileDeleted: make(chan bool, 1),
+		Settings:    s,
 	}
 	// Remove  client after connection ends
 	defer client.UnsubscribeClient()
