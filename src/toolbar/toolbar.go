@@ -70,6 +70,10 @@ func Settings(s *settings.Settings) {
 
 	settingsWindow.Resize(fyne.NewSize(400, 400))
 
+	if s.DownloadPath != "" {
+		downloadPath = s.DownloadPath
+	}
+
 	host := widget.NewEntry()
 	if s.Host != "" {
 		host.SetText(s.Host)
@@ -88,17 +92,6 @@ func Settings(s *settings.Settings) {
 	}
 	password.SetPlaceHolder("password...")
 
-	downloadFolder := dialog.NewFolderOpen(func(f fyne.ListableURI, _ error) {
-		if f == nil {
-			return
-		}
-
-		downloadPath = f.Path()
-	}, settingsWindow)
-
-	button := widget.NewButtonWithIcon("Download Path", theme.FolderIcon(), nil)
-	button.OnTapped = func() { downloadFolder.Show() }
-
 	if s.Encrypted {
 		password.Enable()
 	} else {
@@ -111,6 +104,28 @@ func Settings(s *settings.Settings) {
 			password.Disable()
 		}
 	})
+
+	selectedFolder := widget.NewEntry()
+	selectedFolder.SetText(downloadPath)
+
+	if downloadPath != "" {
+		selectedFolder.Enable()
+	} else {
+		selectedFolder.Disabled()
+	}
+
+	downloadFolder := dialog.NewFolderOpen(func(f fyne.ListableURI, _ error) {
+		if f == nil {
+			return
+		}
+
+		downloadPath = f.Path()
+		selectedFolder.SetText(downloadPath)
+		selectedFolder.Enable()
+	}, settingsWindow)
+
+	downloadFolderButton := widget.NewButtonWithIcon("Download Path", theme.FolderIcon(), nil)
+	downloadFolderButton.OnTapped = func() { downloadFolder.Show() }
 
 	form := &widget.Form{
 		Items: []*widget.FormItem{},
@@ -141,17 +156,14 @@ func Settings(s *settings.Settings) {
 	tg.SetText("Warning: Changes will apply after the client has been restarted")
 	tg.SetStyleRange(0, 0, 0, len(tg.Text()), &widget.CustomTextGridStyle{color.White, color.RGBA{255, 0, 0, 0}})
 
-	dp := widget.NewTextGrid()
-	dp.SetText(fmt.Sprintf("%v", s.DownloadPath))
-
 	// Append form elements
 	form.Append("Host Address", host)
 	form.Append("Host Port", port)
 	form.Append("Encrypt Files", checkBox)
 	form.Append("Encryption Password", password)
-	form.Append("File Download Path", button)
-	if s.DownloadPath != "" {
-		form.Append("Curent Download Path", dp)
+	form.Append("File Download Path", downloadFolderButton)
+	if downloadPath != "" {
+		form.Append("Curent Download Path", selectedFolder)
 	}
 
 	c := container.NewGridWithRows(2, form, tg)
