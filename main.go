@@ -98,7 +98,7 @@ var id int64
 
 func main() {
 	a := app.New()
-	w := a.NewWindow("Filesystem")
+	w := a.NewWindow("Throw")
 	w.SetMaster()
 	w.Resize(fyne.NewSize(500, 500))
 

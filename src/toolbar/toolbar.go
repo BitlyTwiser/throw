@@ -2,6 +2,7 @@ package toolbar
 
 import (
 	"fmt"
+	"image/color"
 	"log"
 
 	"fyne.io/fyne/v2"
@@ -50,11 +51,14 @@ func EditFileWindow(data []byte) {
 func HelpWindow() {
 	helpWindow := fyne.CurrentApp().NewWindow("Help Window")
 	helpWindow.Resize(fyne.NewSize(400, 400))
+	tg := widget.NewTextGrid()
 
-	button := widget.NewButton("Close", func() { helpWindow.Close() })
+	tg.Resize(fyne.NewSize(400, 400))
+
+	tg.SetText("Throw is a vitualized file system utilizing the distributed power of IPFS to host your files.")
 
 	// Neet to size this and add text lol
-	helpWindow.SetContent(button)
+	helpWindow.SetContent(tg)
 
 	helpWindow.Show()
 }
@@ -123,7 +127,6 @@ func Settings(s *settings.Settings) {
 
 			if saved {
 				notifications.SendSuccessNotification("Settings saved")
-				settingsWindow.Close()
 			} else {
 				notifications.SendErrorNotification("Error saving settings")
 			}
@@ -133,14 +136,26 @@ func Settings(s *settings.Settings) {
 		},
 	}
 
+	tg := widget.NewTextGrid()
+	tg.Resize(fyne.NewSize(100, 200))
+	tg.SetText("Warning: Changes will apply after the client has been restarted")
+	tg.SetStyleRange(0, 0, 0, len(tg.Text()), &widget.CustomTextGridStyle{color.White, color.RGBA{255, 0, 0, 0}})
+
+	dp := widget.NewTextGrid()
+	dp.SetText(fmt.Sprintf("%v", s.DownloadPath))
+
 	// Append form elements
 	form.Append("Host Address", host)
 	form.Append("Host Port", port)
 	form.Append("Encrypt Files", checkBox)
 	form.Append("Encryption Password", password)
 	form.Append("File Download Path", button)
+	if s.DownloadPath != "" {
+		form.Append("Curent Download Path", dp)
+	}
 
-	settingsWindow.SetContent(form)
+	c := container.NewGridWithRows(2, form, tg)
+	settingsWindow.SetContent(c)
 
 	settingsWindow.Show()
 }
