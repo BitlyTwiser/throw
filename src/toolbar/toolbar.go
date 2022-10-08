@@ -54,8 +54,29 @@ func HelpWindow() {
 	tg := widget.NewTextGrid()
 
 	tg.Resize(fyne.NewSize(400, 400))
-
-	tg.SetText("Throw is a vitualized file system utilizing the distributed power of IPFS to host your files.")
+	tg.SetText(`
+	Throw is a vitualized file system utilizing the distributed power of IPFS to host your files.
+	--------------------------------------------------------------------------------------------------------------------
+	File Upload: 
+		One can upload files using the Pencil Icon from the main page that is initially loaded upon start of the application.
+		All files adde to the application, will be displayed in real time, when upload/delete actions commence.
+	--------------------------------------------------------------------------------------------------------------------
+	Settings:
+		Using the Gear icon from within the toolbar, the user can set adjust server settings, download path, and if the data is to be encrypted in transit.
+	--------------------------------------------------------------------------------------------------------------------
+	Encryption:
+		Data is encrypted using the tinycrypt golang library. https://github.com/BitlyTwiser/tinycrypt	
+		Tinycrypt uses AES enryption algorithms to protect your data while the files are stored on IPFS.
+	--------------------------------------------------------------------------------------------------------------------
+	IPFS:
+		IPFS is an amazing project known as the InterPlanetary File system. I do reccomend reading the docs to know more about this project.
+		https://docs.ipfs.tech/concepts/what-is-ipfs/
+		For the purposes of this project however, the core element is that your files are distributed to an IPFS node (Pufs gRPC server hosts/runs the node)
+		Those files are then chunked and distributed to numerous peers, no data is stored directly on a disk.
+	--------------------------------------------------------------------------------------------------------------------
+	Server:
+		gRPC is the cornerstone of the realtime transmission elements of Throw. Using the power of the Pufs project, the files are distrubuted to all clients in near real time.
+	`)
 
 	// Neet to size this and add text lol
 	helpWindow.SetContent(tg)
