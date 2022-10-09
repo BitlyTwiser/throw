@@ -79,7 +79,13 @@ func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileNam
 
 		if c.Settings.Encrypted {
 			log.Println("Encrypting file data")
-			ed, err := tinycrypt.EncryptByteStream(c.Settings.Password, chunkedData)
+			pass, err := settings.DecodeString(c.Settings.Password)
+
+			if err != nil {
+				return err
+			}
+
+			ed, err := tinycrypt.EncryptByteStream(pass, chunkedData)
 
 			if err != nil {
 				return err
@@ -276,8 +282,13 @@ func (c *IpfsClient) UploadFileData(fileData []byte, fileSize int64, fileName st
 	}
 
 	if c.Settings.Encrypted {
-		log.Println("Encrypting file data")
-		ed, err := tinycrypt.EncryptByteStream(c.Settings.Password, fileData)
+		pass, err := settings.DecodeString(c.Settings.Password)
+
+		if err != nil {
+			return err
+		}
+
+		ed, err := tinycrypt.EncryptByteStream(pass, fileData)
 
 		if err != nil {
 			return err
