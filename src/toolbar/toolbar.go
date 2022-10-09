@@ -174,7 +174,7 @@ func Settings(s *settings.Settings) {
 
 	tg := widget.NewTextGrid()
 	tg.Resize(fyne.NewSize(100, 200))
-	tg.SetText("Warning: Changes will apply after the client has been restarted")
+	tg.SetText("Warning: Any Host/IP changes will apply after the client has been restarted")
 	tg.SetStyleRange(0, 0, 0, len(tg.Text()), &widget.CustomTextGridStyle{color.White, color.RGBA{255, 0, 0, 0}})
 
 	// Append form elements

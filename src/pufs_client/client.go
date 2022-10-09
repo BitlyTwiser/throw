@@ -12,11 +12,12 @@ import (
 	"time"
 
 	pufs_pb "github.com/BitlyTwiser/pufs-server/proto"
+
 	"github.com/BitlyTwiser/throw/src/notifications"
 	"github.com/BitlyTwiser/throw/src/settings"
 	"github.com/BitlyTwiser/tinychunk"
 
-	//	"github.com/BitlyTwiser/tinycrypt"
+	"github.com/BitlyTwiser/tinycrypt"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -75,6 +76,17 @@ func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileNam
 	wg.Add(int(totalChunks))
 	err = tinychunk.Chunk(data, 2, func(chunkedData []byte) error {
 		defer wg.Done()
+
+		if c.Settings.Encrypted {
+			log.Println("Encrypting file data")
+			ed, err := tinycrypt.EncryptByteStream(c.Settings.Password, chunkedData)
+
+			if err != nil {
+				return err
+			}
+
+			chunkedData = *ed
+		}
 
 		log.Println("Sending chunked data")
 		if err := fileUpload.Send(&pufs_pb.UploadFileStreamRequest{Data: &pufs_pb.UploadFileStreamRequest_FileData{FileData: chunkedData}}); err != nil {
@@ -261,6 +273,17 @@ func (c *IpfsClient) UploadFileData(fileData []byte, fileSize int64, fileName st
 		FileSize:   fileSize,
 		IpfsHash:   "",
 		UploadedAt: timestamppb.New(time.Now()),
+	}
+
+	if c.Settings.Encrypted {
+		log.Println("Encrypting file data")
+		ed, err := tinycrypt.EncryptByteStream(c.Settings.Password, fileData)
+
+		if err != nil {
+			return err
+		}
+
+		fileData = *ed
 	}
 
 	log.Println("Uploading file")

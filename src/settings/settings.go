@@ -56,6 +56,7 @@ func LoadSettings() *Settings {
 	log.Println("Loading settings")
 	s := &Settings{}
 
+	// If the settings file does now exist, write the generic struct outline to the file.
 	if _, err := os.Stat(settingsFilePath); os.IsNotExist(err) {
 		file, err := os.OpenFile(settingsFilePath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
 
@@ -91,6 +92,10 @@ func LoadSettings() *Settings {
 
 	if err != nil {
 		log.Printf("Error unmarshalling data. Error: %v", err)
+	}
+
+	// Decode password here.
+	if s.Encrypted {
 	}
 
 	return s

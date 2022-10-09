@@ -6,6 +6,7 @@ require (
 	fyne.io/fyne/v2 v2.2.3
 	github.com/BitlyTwiser/pufs-server v0.0.0-20220929001802-d66487b35081
 	github.com/BitlyTwiser/tinychunk v1.0.0
+	github.com/BitlyTwiser/tinycrypt v1.0.0
 	google.golang.org/grpc v1.49.0
 	google.golang.org/protobuf v1.28.1
 )
