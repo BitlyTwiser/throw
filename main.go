@@ -78,11 +78,13 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 				log.Println("Refreshing.")
 				fileList.Refresh()
 			case file := <-client.DeletedFile:
-				for i, v := range client.Files {
-					if v == file {
-						client.Files = append(client.Files[:i], client.Files[i+1:]...)
+				var refresh []string
+				for _, v := range client.Files {
+					if v != file {
+						refresh = append(refresh, v)
 					}
 				}
+				client.Files = refresh
 				log.Println("Refreshing after deleting file.")
 				fileList.Refresh()
 			}

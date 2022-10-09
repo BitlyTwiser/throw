@@ -79,13 +79,8 @@ func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileNam
 
 		if c.Settings.Encrypted {
 			log.Println("Encrypting file data")
-			pass, err := settings.DecodeString(c.Settings.Password)
 
-			if err != nil {
-				return err
-			}
-
-			ed, err := tinycrypt.EncryptByteStream(pass, chunkedData)
+			ed, err := tinycrypt.EncryptByteStream(c.Settings.Password, chunkedData)
 
 			if err != nil {
 				return err
@@ -194,6 +189,7 @@ func (c *IpfsClient) DeleteFile(fileName string) error {
 }
 
 func (c *IpfsClient) DownloadCappedFile(fileName, path string) error {
+	var data []byte
 	log.Printf("Downloading larger file: %v", fileName)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -227,7 +223,19 @@ func (c *IpfsClient) DownloadCappedFile(fileName, path string) error {
 			return err
 		}
 
-		n, err := file.Write(fileChunk.GetFileData())
+		data = fileChunk.GetFileData()
+
+		if c.Settings.Encrypted {
+			dd, err := tinycrypt.DecryptByteStream(c.Settings.Password, fileChunk.GetFileData())
+
+			if err != nil {
+				return err
+			}
+
+			data = *dd
+		}
+
+		n, err := file.Write(data)
 
 		if err != nil {
 			return err
@@ -256,6 +264,16 @@ func (c *IpfsClient) DownloadFile(fileName, path string) error {
 
 	fileData, fileMetadata := fileResp.FileData, fileResp.FileMetadata
 
+	if c.Settings.Encrypted {
+		dd, err := tinycrypt.DecryptByteStream(c.Settings.Password, fileData)
+
+		if err != nil {
+			return nil
+		}
+
+		fileData = *dd
+	}
+
 	log.Println("Downloading file and saving to disk...")
 
 	err = os.WriteFile(fmt.Sprintf("%v/%v", path, fileMetadata.Filename), fileData, 0600)
@@ -282,13 +300,7 @@ func (c *IpfsClient) UploadFileData(fileData []byte, fileSize int64, fileName st
 	}
 
 	if c.Settings.Encrypted {
-		pass, err := settings.DecodeString(c.Settings.Password)
-
-		if err != nil {
-			return err
-		}
-
-		ed, err := tinycrypt.EncryptByteStream(pass, fileData)
+		ed, err := tinycrypt.EncryptByteStream(c.Settings.Password, fileData)
 
 		if err != nil {
 			return err

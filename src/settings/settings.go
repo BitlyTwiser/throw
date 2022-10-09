@@ -1,7 +1,6 @@
 package settings
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -27,6 +26,8 @@ func (s Settings) CurrentSettings() Settings {
 func (s *Settings) SaveSettings(settings Settings) bool {
 	s.SaveSettingsMemory(&settings)
 
+	settings.Password = Base64EncodeString([]byte(settings.Password))
+
 	file, err := os.OpenFile(settingsFilePath, os.O_TRUNC|os.O_RDWR, 0600)
 
 	if err != nil {
@@ -50,17 +51,6 @@ func (s *Settings) SaveSettings(settings Settings) bool {
 
 func (s *Settings) SaveSettingsMemory(settings *Settings) {
 	*s = *settings
-}
-
-func DecodeString(val string) (string, error) {
-	dst := make([]byte, base64.StdEncoding.DecodedLen(len(val)))
-	n, err := base64.StdEncoding.Decode(dst, []byte(val))
-	if err != nil {
-		log.Println("Error decodign string")
-
-		return "", err
-	}
-	return string(dst[:n]), nil
 }
 
 // Load settings from file.

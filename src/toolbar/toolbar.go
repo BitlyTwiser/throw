@@ -1,7 +1,6 @@
 package toolbar
 
 import (
-	"encoding/base64"
 	"fmt"
 	"image/color"
 	"log"
@@ -85,13 +84,6 @@ func HelpWindow() {
 	helpWindow.Show()
 }
 
-func base64EncodeString(data []byte) string {
-	dst := make([]byte, base64.StdEncoding.EncodedLen(len(data)))
-	base64.StdEncoding.Encode(dst, data)
-
-	return string(dst)
-}
-
 // Set the values from the settings on load
 func Settings(s *settings.Settings) {
 	var downloadPath string
@@ -165,7 +157,7 @@ func Settings(s *settings.Settings) {
 				Host:         host.Text,
 				Port:         port.Text,
 				Encrypted:    checkBox.Checked,
-				Password:     base64EncodeString([]byte(password.Text)),
+				Password:     password.Text,
 				DownloadPath: downloadPath,
 			}
 
