@@ -21,14 +21,16 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+//Note: FileUploadedInApp Denotes if the file was uploaded in the application. If so, skip the reload when server sends back the ACK that a file was uploaded
 type IpfsClient struct {
-	Id          int64
-	Client      pufs_pb.IpfsFileSystemClient
-	Files       []string
-	FileUpload  chan string
-	DeletedFile chan string
-	FileDeleted chan bool
-	Settings    *settings.Settings
+	Id                int64
+	Client            pufs_pb.IpfsFileSystemClient
+	Files             []string
+	FileUpload        chan string
+	DeletedFile       chan string
+	FileDeleted       chan bool
+	FileUploadedInApp chan bool
+	Settings          *settings.Settings
 }
 
 func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileName string) error {
@@ -117,6 +119,9 @@ func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileNam
 	} else {
 		return errors.New("server did not say successful")
 	}
+
+	c.FileUpload <- fileName
+	c.FileUploadedInApp <- true
 
 	return nil
 }
@@ -322,6 +327,9 @@ func (c *IpfsClient) UploadFileData(fileData []byte, fileSize int64, fileName st
 		return errors.New("something went wrong uploading file")
 	}
 
+	c.FileUpload <- fileName
+	c.FileUploadedInApp <- true
+
 	return nil
 }
 
@@ -384,10 +392,15 @@ func (c *IpfsClient) SubscribeFileStream() {
 			}
 			log.Printf("Pushing file.. Filename: %v", file.Files.Filename)
 
-			if len(c.FileDeleted) == 0 {
-				c.FileUpload <- file.Files.Filename
+			del := <-c.FileDeleted
+			fa := <-c.FileUploadedInApp
+
+			if del {
+				c.FileDeleted <- false
+			} else if fa {
+				c.FileUploadedInApp <- false
 			} else {
-				<-c.FileDeleted
+				c.FileUpload <- file.Files.Filename
 			}
 		}
 	}

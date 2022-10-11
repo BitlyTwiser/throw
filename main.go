@@ -123,13 +123,14 @@ func main() {
 	c := pufs_pb.NewIpfsFileSystemClient(conn)
 
 	client := pufs_client.IpfsClient{
-		Id:          id,
-		Client:      c,
-		Files:       []string{},
-		FileUpload:  make(chan string, 1),
-		DeletedFile: make(chan string, 1),
-		FileDeleted: make(chan bool, 1),
-		Settings:    s,
+		Id:                id,
+		Client:            c,
+		Files:             []string{},
+		FileUpload:        make(chan string, 1),
+		DeletedFile:       make(chan string, 1),
+		FileDeleted:       make(chan bool, 2),
+		FileUploadedInApp: make(chan bool, 2),
+		Settings:          s,
 	}
 	// Remove  client after connection ends
 	defer client.UnsubscribeClient()
