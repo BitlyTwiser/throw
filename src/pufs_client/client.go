@@ -8,6 +8,8 @@ import (
 	"log"
 	"math"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,7 +33,10 @@ type IpfsClient struct {
 	FileDeleted       chan bool
 	FileUploadedInApp chan bool
 	Settings          *settings.Settings
+	nameInt           int
 }
+
+type Empty struct{}
 
 func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileName string) error {
 	var wg sync.WaitGroup
@@ -45,6 +50,8 @@ func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileNam
 	if err != nil {
 		return err
 	}
+
+	fileName = c.createUniqueFileName(fileName)
 
 	//No IPFS hash here, that will not be known until we upload on server
 	metadata := &pufs_pb.File{
@@ -297,6 +304,8 @@ func (c *IpfsClient) UploadFileData(fileData []byte, fileSize int64, fileName st
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	fileName = c.createUniqueFileName(fileName)
+
 	file := &pufs_pb.File{
 		Filename:   fileName,
 		FileSize:   fileSize,
@@ -424,4 +433,45 @@ func (c *IpfsClient) UnsubscribeClient() {
 	defer cancel()
 
 	c.Client.UnsubscribeFileStream(ctx, &pufs_pb.FilesRequest{Id: c.Id})
+}
+
+func (c *IpfsClient) fileExists(fileName string) bool {
+	var void Empty
+
+	set := make(map[string]Empty)
+
+	for _, v := range c.Files {
+		if _, ok := set[v]; ok {
+			continue
+		} else {
+			set[v] = void
+		}
+	}
+
+	for k := range set {
+		if k == fileName {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (c *IpfsClient) createUniqueFileName(fileName string) string {
+	if !c.fileExists(fileName) {
+		return fileName
+	} else {
+		c.nameInt++
+		extension := filepath.Ext(fileName)
+		file := strings.TrimSuffix(fileName, extension)
+
+		fileName = fmt.Sprintf("%v%v%v", file, c.nameInt, extension)
+
+		if c.fileExists(fileName) {
+			return c.createUniqueFileName(fileName)
+		} else {
+			c.nameInt = 0
+			return fileName
+		}
+	}
 }
