@@ -8,27 +8,35 @@ import (
 	"log"
 	"math"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	pufs_pb "github.com/BitlyTwiser/pufs-server/proto"
+
 	"github.com/BitlyTwiser/throw/src/notifications"
 	"github.com/BitlyTwiser/throw/src/settings"
 	"github.com/BitlyTwiser/tinychunk"
 
-	//	"github.com/BitlyTwiser/tinycrypt"
+	"github.com/BitlyTwiser/tinycrypt"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+//Note: FileUploadedInApp Denotes if the file was uploaded in the application. If so, skip the reload when server sends back the ACK that a file was uploaded
 type IpfsClient struct {
-	Id          int64
-	Client      pufs_pb.IpfsFileSystemClient
-	Files       []string
-	FileUpload  chan string
-	DeletedFile chan string
-	FileDeleted chan bool
-	Settings    *settings.Settings
+	Id                int64
+	Client            pufs_pb.IpfsFileSystemClient
+	Files             []string
+	FileUpload        chan string
+	DeletedFile       chan string
+	FileDeleted       chan bool
+	FileUploadedInApp chan bool
+	Settings          *settings.Settings
+	nameInt           int
 }
+
+type Empty struct{}
 
 func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileName string) error {
 	var wg sync.WaitGroup
@@ -42,6 +50,8 @@ func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileNam
 	if err != nil {
 		return err
 	}
+
+	fileName = c.createUniqueFileName(fileName)
 
 	//No IPFS hash here, that will not be known until we upload on server
 	metadata := &pufs_pb.File{
@@ -76,6 +86,18 @@ func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileNam
 	err = tinychunk.Chunk(data, 2, func(chunkedData []byte) error {
 		defer wg.Done()
 
+		if c.Settings.Encrypted {
+			log.Println("Encrypting file data")
+
+			ed, err := tinycrypt.EncryptByteStream(c.Settings.Password, chunkedData)
+
+			if err != nil {
+				return err
+			}
+
+			chunkedData = *ed
+		}
+
 		log.Println("Sending chunked data")
 		if err := fileUpload.Send(&pufs_pb.UploadFileStreamRequest{Data: &pufs_pb.UploadFileStreamRequest_FileData{FileData: chunkedData}}); err != nil {
 			log.Printf("Error sending file: %v", err)
@@ -104,6 +126,9 @@ func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileNam
 	} else {
 		return errors.New("server did not say successful")
 	}
+
+	c.FileUpload <- fileName
+	c.FileUploadedInApp <- true
 
 	return nil
 }
@@ -176,6 +201,7 @@ func (c *IpfsClient) DeleteFile(fileName string) error {
 }
 
 func (c *IpfsClient) DownloadCappedFile(fileName, path string) error {
+	var data []byte
 	log.Printf("Downloading larger file: %v", fileName)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -209,7 +235,19 @@ func (c *IpfsClient) DownloadCappedFile(fileName, path string) error {
 			return err
 		}
 
-		n, err := file.Write(fileChunk.GetFileData())
+		data = fileChunk.GetFileData()
+
+		if c.Settings.Encrypted {
+			dd, err := tinycrypt.DecryptByteStream(c.Settings.Password, fileChunk.GetFileData())
+
+			if err != nil {
+				return err
+			}
+
+			data = *dd
+		}
+
+		n, err := file.Write(data)
 
 		if err != nil {
 			return err
@@ -238,6 +276,16 @@ func (c *IpfsClient) DownloadFile(fileName, path string) error {
 
 	fileData, fileMetadata := fileResp.FileData, fileResp.FileMetadata
 
+	if c.Settings.Encrypted {
+		dd, err := tinycrypt.DecryptByteStream(c.Settings.Password, fileData)
+
+		if err != nil {
+			return nil
+		}
+
+		fileData = *dd
+	}
+
 	log.Println("Downloading file and saving to disk...")
 
 	err = os.WriteFile(fmt.Sprintf("%v/%v", path, fileMetadata.Filename), fileData, 0600)
@@ -256,11 +304,23 @@ func (c *IpfsClient) UploadFileData(fileData []byte, fileSize int64, fileName st
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	fileName = c.createUniqueFileName(fileName)
+
 	file := &pufs_pb.File{
 		Filename:   fileName,
 		FileSize:   fileSize,
 		IpfsHash:   "",
 		UploadedAt: timestamppb.New(time.Now()),
+	}
+
+	if c.Settings.Encrypted {
+		ed, err := tinycrypt.EncryptByteStream(c.Settings.Password, fileData)
+
+		if err != nil {
+			return err
+		}
+
+		fileData = *ed
 	}
 
 	log.Println("Uploading file")
@@ -275,6 +335,9 @@ func (c *IpfsClient) UploadFileData(fileData []byte, fileSize int64, fileName st
 	if !resp.Sucessful {
 		return errors.New("something went wrong uploading file")
 	}
+
+	c.FileUpload <- fileName
+	c.FileUploadedInApp <- true
 
 	return nil
 }
@@ -338,10 +401,15 @@ func (c *IpfsClient) SubscribeFileStream() {
 			}
 			log.Printf("Pushing file.. Filename: %v", file.Files.Filename)
 
-			if len(c.FileDeleted) == 0 {
-				c.FileUpload <- file.Files.Filename
+			del := <-c.FileDeleted
+			fa := <-c.FileUploadedInApp
+
+			if del {
+				c.FileDeleted <- false
+			} else if fa {
+				c.FileUploadedInApp <- false
 			} else {
-				<-c.FileDeleted
+				c.FileUpload <- file.Files.Filename
 			}
 		}
 	}
@@ -365,4 +433,45 @@ func (c *IpfsClient) UnsubscribeClient() {
 	defer cancel()
 
 	c.Client.UnsubscribeFileStream(ctx, &pufs_pb.FilesRequest{Id: c.Id})
+}
+
+func (c *IpfsClient) fileExists(fileName string) bool {
+	var void Empty
+
+	set := make(map[string]Empty)
+
+	for _, v := range c.Files {
+		if _, ok := set[v]; ok {
+			continue
+		} else {
+			set[v] = void
+		}
+	}
+
+	for k := range set {
+		if k == fileName {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (c *IpfsClient) createUniqueFileName(fileName string) string {
+	if !c.fileExists(fileName) {
+		return fileName
+	} else {
+		c.nameInt++
+		extension := filepath.Ext(fileName)
+		file := strings.TrimSuffix(fileName, extension)
+
+		fileName = fmt.Sprintf("%v%v%v", file, c.nameInt, extension)
+
+		if c.fileExists(fileName) {
+			return c.createUniqueFileName(fileName)
+		} else {
+			c.nameInt = 0
+			return fileName
+		}
+	}
 }

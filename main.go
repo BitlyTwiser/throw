@@ -78,11 +78,13 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 				log.Println("Refreshing.")
 				fileList.Refresh()
 			case file := <-client.DeletedFile:
-				for i, v := range client.Files {
-					if v == file {
-						client.Files = append(client.Files[:i], client.Files[i+1:]...)
+				var refresh []string
+				for _, v := range client.Files {
+					if v != file {
+						refresh = append(refresh, v)
 					}
 				}
+				client.Files = refresh
 				log.Println("Refreshing after deleting file.")
 				fileList.Refresh()
 			}
@@ -121,13 +123,14 @@ func main() {
 	c := pufs_pb.NewIpfsFileSystemClient(conn)
 
 	client := pufs_client.IpfsClient{
-		Id:          id,
-		Client:      c,
-		Files:       []string{},
-		FileUpload:  make(chan string, 1),
-		DeletedFile: make(chan string, 1),
-		FileDeleted: make(chan bool, 1),
-		Settings:    s,
+		Id:                id,
+		Client:            c,
+		Files:             []string{},
+		FileUpload:        make(chan string, 1),
+		DeletedFile:       make(chan string, 1),
+		FileDeleted:       make(chan bool, 2),
+		FileUploadedInApp: make(chan bool, 2),
+		Settings:          s,
 	}
 	// Remove  client after connection ends
 	defer client.UnsubscribeClient()

@@ -26,6 +26,8 @@ func (s Settings) CurrentSettings() Settings {
 func (s *Settings) SaveSettings(settings Settings) bool {
 	s.SaveSettingsMemory(&settings)
 
+	settings.Password = Base64EncodeString([]byte(settings.Password))
+
 	file, err := os.OpenFile(settingsFilePath, os.O_TRUNC|os.O_RDWR, 0600)
 
 	if err != nil {
@@ -56,6 +58,7 @@ func LoadSettings() *Settings {
 	log.Println("Loading settings")
 	s := &Settings{}
 
+	// If the settings file does now exist, write the generic struct outline to the file.
 	if _, err := os.Stat(settingsFilePath); os.IsNotExist(err) {
 		file, err := os.OpenFile(settingsFilePath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0600)
 
@@ -91,6 +94,15 @@ func LoadSettings() *Settings {
 
 	if err != nil {
 		log.Printf("Error unmarshalling data. Error: %v", err)
+	}
+
+	// Decode password here.
+	if s.Password != "" {
+		pass, err := DecodeString(s.Password)
+
+		if err == nil {
+			s.Password = pass
+		}
 	}
 
 	return s
