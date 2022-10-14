@@ -131,6 +131,7 @@ func main() {
 		FileDeleted:       make(chan bool, 2),
 		FileUploadedInApp: make(chan bool, 2),
 		Settings:          s,
+		InvalidFileTypes:  []string{"ELF", "EXE"},
 	}
 	// Remove  client after connection ends
 	defer client.UnsubscribeClient()
