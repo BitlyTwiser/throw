@@ -34,6 +34,7 @@ type IpfsClient struct {
 	FileUploadedInApp chan bool
 	Settings          *settings.Settings
 	nameInt           int
+	InvalidFileTypes  []string
 }
 
 type Empty struct{}
@@ -78,6 +79,11 @@ func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileNam
 		log.Printf("Error sending first request: %v", err)
 	}
 
+	validFile := c.validFileType(data)
+
+	if !validFile {
+		log.Println("Invalid file type, cannot encrypt binary files.")
+	}
 	// Total chunks is utilized here to ensure we add enough wait groups.
 	// In this particular case, we are chunking the data into 2MB chunks. If alloted amount was altered, we would be forced to revisit this logic.
 	totalChunks := uint(math.Floor(float64(fileSize) / float64((2 << 20))))
@@ -86,7 +92,7 @@ func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileNam
 	err = tinychunk.Chunk(data, 2, func(chunkedData []byte) error {
 		defer wg.Done()
 
-		if c.Settings.Encrypted {
+		if c.Settings.Encrypted && validFile {
 			log.Println("Encrypting file data")
 
 			ed, err := tinycrypt.EncryptByteStream(c.Settings.Password, chunkedData)
@@ -313,7 +319,14 @@ func (c *IpfsClient) UploadFileData(fileData []byte, fileSize int64, fileName st
 		UploadedAt: timestamppb.New(time.Now()),
 	}
 
-	if c.Settings.Encrypted {
+	validFile := c.validFileType(fileData)
+
+	if !validFile {
+		log.Println("Cannot encrypt binary files")
+	}
+
+	// Validate if files are binary files here.
+	if c.Settings.Encrypted && validFile {
 		ed, err := tinycrypt.EncryptByteStream(c.Settings.Password, fileData)
 
 		if err != nil {
@@ -474,4 +487,29 @@ func (c *IpfsClient) createUniqueFileName(fileName string) string {
 			return fileName
 		}
 	}
+}
+
+func (c *IpfsClient) validFileType(stream []byte) bool {
+	// If there is not stream of data and we got this far.. probably a bigger issue elsewhere.
+	if stream == nil {
+		return false
+	}
+
+	// If data is some abstract stream of text, still encrypt.
+	// 4 is the magic byte number which will hold the header content denoting what the file is.
+	// i.e. the first 4 bytes would be ELF, EXE etc..
+	if len(stream) < 4 {
+		return true
+	}
+
+	// Parse first 4 bytes
+	fileHeader := stream[1:4]
+
+	for _, t := range c.InvalidFileTypes {
+		if t == string(fileHeader) {
+			return false
+		}
+	}
+
+	return true
 }
