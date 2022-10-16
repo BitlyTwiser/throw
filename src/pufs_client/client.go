@@ -521,7 +521,13 @@ func (c *IpfsClient) DownloadedFileContent(fileName string) (*[]byte, error) {
 		return nil, err
 	}
 
-	return &fileData, nil
+	if c.validFileType(fileData) {
+		return &fileData, nil
+	} else {
+		notifications.SendErrorNotification("Can only edit non binary files!")
+
+		return nil, errors.New("Can only edit non binary files")
+	}
 }
 
 func (c *IpfsClient) validFileType(stream []byte) bool {
