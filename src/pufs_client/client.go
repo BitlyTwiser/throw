@@ -489,6 +489,21 @@ func (c *IpfsClient) createUniqueFileName(fileName string) string {
 	}
 }
 
+func (c *IpfsClient) Download(fileName string) {
+	var err error
+	if c.ChunkFile(fileName) {
+		err = c.DownloadCappedFile(fileName, c.Settings.DownloadPath)
+	} else {
+		err = c.DownloadFile(fileName, c.Settings.DownloadPath)
+	}
+
+	if err != nil {
+		notifications.SendErrorNotification(fmt.Sprintf("Error downloading file: %v", fileName))
+	} else {
+		notifications.SendSuccessNotification(fmt.Sprintf("File %v downloaded", fileName))
+	}
+}
+
 func (c *IpfsClient) validFileType(stream []byte) bool {
 	// If there is not stream of data and we got this far.. probably a bigger issue elsewhere.
 	if stream == nil {

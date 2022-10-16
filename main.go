@@ -11,7 +11,6 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/BitlyTwiser/throw/src/notifications"
 	"github.com/BitlyTwiser/throw/src/pufs_client"
 	"github.com/BitlyTwiser/throw/src/settings"
 	"github.com/BitlyTwiser/throw/src/toolbar"
@@ -34,11 +33,48 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 	fileList := widget.NewList(
 		func() int { return len(client.Files) },
 		func() fyne.CanvasObject {
-			return container.NewGridWithColumns(3, container.NewPadded(widget.NewLabel("")), container.NewPadded(widget.NewButtonWithIcon("Delete", theme.DownloadIcon(), nil)), container.NewPadded(widget.NewButtonWithIcon("Download", theme.DeleteIcon(), nil)))
+			deleteButton := widget.NewButtonWithIcon("", theme.DeleteIcon(), nil)
+			deleteButton.Resize(fyne.NewSize(5, 5))
+
+			downloadButton := widget.NewButtonWithIcon("", theme.DownloadIcon(), nil)
+			downloadButton.Resize(fyne.NewSize(5, 5))
+
+			editButton := widget.NewButtonWithIcon("", theme.ContentAddIcon(), nil)
+			editButton.Resize(fyne.NewSize(5, 5))
+
+			fileNameLabel := widget.NewLabel("")
+			fileNameLabel.Wrapping = 1
+
+			return container.NewGridWithColumns(
+				4,
+				container.NewPadded(fileNameLabel),
+				container.NewPadded(editButton),
+				container.NewPadded(downloadButton),
+				container.NewPadded(deleteButton),
+			)
 		},
 		func(i widget.ListItemID, o fyne.CanvasObject) {
-			o.(*fyne.Container).Objects[0].(*fyne.Container).Objects[0].(*widget.Label).SetText(fmt.Sprintf("Name: %v", client.Files[i]))
+			o.(*fyne.Container).Objects[0].(*fyne.Container).Objects[0].(*widget.Label).SetText(client.Files[i])
 			o.(*fyne.Container).Objects[1].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
+				fileName := client.Files[i]
+				w := fyne.CurrentApp().NewWindow(fmt.Sprintf("Edit %v", fileName))
+				w.Resize(fyne.NewSize(300, 400))
+
+				// Open File editor
+				w.SetContent(pufs_client.FileEditor([]byte("Sup yo filthy animal")))
+
+				// get content of file and display.
+				// 1. Download file
+				// 2. Read file
+				// 3. Show file stream as text in window.
+				//w.SetContent()
+
+				w.Show()
+			}
+			o.(*fyne.Container).Objects[2].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
+				client.Download(client.Files[i])
+			}
+			o.(*fyne.Container).Objects[3].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
 				var message *fyne.Notification
 				fileName := client.Files[i]
 				err := client.DeleteFile(fileName)
@@ -50,22 +86,6 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 				}
 
 				fyne.CurrentApp().SendNotification(message)
-			}
-			o.(*fyne.Container).Objects[2].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
-				fileName := client.Files[i]
-				var err error
-
-				if client.ChunkFile(fileName) {
-					err = client.DownloadCappedFile(fileName, client.Settings.DownloadPath)
-				} else {
-					err = client.DownloadFile(fileName, client.Settings.DownloadPath)
-				}
-
-				if err != nil {
-					notifications.SendErrorNotification(fmt.Sprintf("Error downloading file: %v", fileName))
-				} else {
-					notifications.SendSuccessNotification(fmt.Sprintf("File %v downloaded", fileName))
-				}
 			}
 		},
 	)
@@ -102,7 +122,7 @@ func main() {
 	a := app.New()
 	w := a.NewWindow("Throw")
 	w.SetMaster()
-	w.Resize(fyne.NewSize(500, 500))
+	w.Resize(fyne.NewSize(750, 500))
 
 	rand.Seed(time.Now().UTC().UnixNano())
 	//Note: Look to add validation server side that ID is unique.
