@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/BitlyTwiser/throw/src/notifications"
 	"github.com/BitlyTwiser/throw/src/pufs_client"
 	"github.com/BitlyTwiser/throw/src/settings"
 	"github.com/BitlyTwiser/throw/src/toolbar"
@@ -60,14 +61,24 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 				w := fyne.CurrentApp().NewWindow(fmt.Sprintf("Edit %v", fileName))
 				w.Resize(fyne.NewSize(300, 400))
 
-				// Open File editor
-				w.SetContent(pufs_client.FileEditor([]byte("Sup yo filthy animal")))
+				err := client.Download(fileName)
 
-				// get content of file and display.
-				// 1. Download file
-				// 2. Read file
-				// 3. Show file stream as text in window.
-				//w.SetContent()
+				if err != nil {
+					notifications.SendErrorNotification("Error opening file for editing.")
+
+					return
+				}
+
+				data, err := client.DownloadedFileContent(fileName)
+
+				if err != nil {
+					notifications.SendErrorNotification("Error loading file data for editing..")
+
+					return
+				}
+
+				// Open File editor
+				w.SetContent(pufs_client.FileEditor(*data, client, fileName, w))
 
 				w.Show()
 			}

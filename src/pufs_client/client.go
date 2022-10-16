@@ -489,7 +489,7 @@ func (c *IpfsClient) createUniqueFileName(fileName string) string {
 	}
 }
 
-func (c *IpfsClient) Download(fileName string) {
+func (c *IpfsClient) Download(fileName string) error {
 	var err error
 	if c.ChunkFile(fileName) {
 		err = c.DownloadCappedFile(fileName, c.Settings.DownloadPath)
@@ -499,9 +499,29 @@ func (c *IpfsClient) Download(fileName string) {
 
 	if err != nil {
 		notifications.SendErrorNotification(fmt.Sprintf("Error downloading file: %v", fileName))
+		return err
 	} else {
 		notifications.SendSuccessNotification(fmt.Sprintf("File %v downloaded", fileName))
+		return nil
 	}
+}
+
+// Returns byte array of file content. Uses the file path for downloaded files.
+// Validates a given file is found with that name. (Note: this should be calld after "Download" has ran successfully)
+func (c *IpfsClient) DownloadedFileContent(fileName string) (*[]byte, error) {
+	fileData, err := os.ReadFile(fmt.Sprintf("%v/%v", c.Settings.DownloadPath, fileName))
+
+	if err != nil && os.IsNotExist(err) {
+		notifications.SendErrorNotification("File not found locally, try to Download the file first")
+
+		return nil, err
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &fileData, nil
 }
 
 func (c *IpfsClient) validFileType(stream []byte) bool {
