@@ -11,6 +11,7 @@ import (
 	"github.com/BitlyTwiser/throw/src/notifications"
 )
 
+// By the nature of the IPFS system, IPFS hashes are immutable. Thus, in order for us to peoperly "update" a file, we must first delete the file then re-add the file.
 func FileEditor(data []byte, client IpfsClient, fileName string, w fyne.Window) *fyne.Container {
 
 	fileEditor := widget.NewMultiLineEntry()
@@ -20,7 +21,16 @@ func FileEditor(data []byte, client IpfsClient, fileName string, w fyne.Window) 
 
 	toolbar := widget.NewToolbar(
 		widget.NewToolbarAction(theme.DocumentSaveIcon(), func() {
-			err := saveFile(
+			//Delete file
+			err := client.DeleteFile(fileName)
+
+			if err != nil {
+				notifications.SendErrorNotification("Error saving file")
+
+				return
+			}
+			//Re-Add newfound data
+			err = saveFile(
 				fileEditor.Text,
 				client.Settings.DownloadPath,
 				fileName)
