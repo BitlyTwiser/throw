@@ -183,7 +183,7 @@ func (c *IpfsClient) UploadFile(path, fileName string) error {
 	return nil
 }
 
-func (c *IpfsClient) DeleteFile(fileName string) error {
+func (c *IpfsClient) DeleteFile(fileName string, showMessage bool) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -194,7 +194,9 @@ func (c *IpfsClient) DeleteFile(fileName string) error {
 	}
 
 	if resp.Successful {
-		notifications.SendSuccessNotification("File Deleted")
+		if showMessage {
+			notifications.SendSuccessNotification("File Deleted")
+		}
 	} else {
 		return fmt.Errorf("error occured deleting file: %v", resp)
 	}

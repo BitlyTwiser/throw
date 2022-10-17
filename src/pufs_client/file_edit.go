@@ -22,10 +22,10 @@ func FileEditor(data []byte, client IpfsClient, fileName string, w fyne.Window) 
 	toolbar := widget.NewToolbar(
 		widget.NewToolbarAction(theme.DocumentSaveIcon(), func() {
 			//Delete file
-			err := client.DeleteFile(fileName)
+			err := client.DeleteFile(fileName, false)
 
 			if err != nil {
-				notifications.SendErrorNotification("Error saving file")
+				notifications.SendErrorNotification(fmt.Sprintf("Error saving file. Error: %v", err))
 
 				return
 			}

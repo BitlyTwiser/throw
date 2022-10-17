@@ -88,7 +88,7 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 			o.(*fyne.Container).Objects[3].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
 				var message *fyne.Notification
 				fileName := client.Files[i]
-				err := client.DeleteFile(fileName)
+				err := client.DeleteFile(fileName, true)
 
 				if err != nil {
 					message = fyne.NewNotification("Error", fmt.Sprintf("Error deleting file: %v", fileName))
