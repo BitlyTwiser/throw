@@ -183,7 +183,7 @@ func (c *IpfsClient) UploadFile(path, fileName string) error {
 	return nil
 }
 
-func (c *IpfsClient) DeleteFile(fileName string) error {
+func (c *IpfsClient) DeleteFile(fileName string, showMessage bool) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -194,7 +194,9 @@ func (c *IpfsClient) DeleteFile(fileName string) error {
 	}
 
 	if resp.Successful {
-		notifications.SendSuccessNotification("File Deleted")
+		if showMessage {
+			notifications.SendSuccessNotification("File Deleted")
+		}
 	} else {
 		return fmt.Errorf("error occured deleting file: %v", resp)
 	}
@@ -486,6 +488,47 @@ func (c *IpfsClient) createUniqueFileName(fileName string) string {
 			c.nameInt = 0
 			return fileName
 		}
+	}
+}
+
+func (c *IpfsClient) Download(fileName string) error {
+	var err error
+	if c.ChunkFile(fileName) {
+		err = c.DownloadCappedFile(fileName, c.Settings.DownloadPath)
+	} else {
+		err = c.DownloadFile(fileName, c.Settings.DownloadPath)
+	}
+
+	if err != nil {
+		notifications.SendErrorNotification(fmt.Sprintf("Error downloading file: %v", fileName))
+		return err
+	} else {
+		notifications.SendSuccessNotification(fmt.Sprintf("File %v downloaded", fileName))
+		return nil
+	}
+}
+
+// Returns byte array of file content. Uses the file path for downloaded files.
+// Validates a given file is found with that name. (Note: this should be calld after "Download" has ran successfully)
+func (c *IpfsClient) DownloadedFileContent(fileName string) (*[]byte, error) {
+	fileData, err := os.ReadFile(fmt.Sprintf("%v/%v", c.Settings.DownloadPath, fileName))
+
+	if err != nil && os.IsNotExist(err) {
+		notifications.SendErrorNotification("File not found locally, try to Download the file first")
+
+		return nil, err
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	if c.validFileType(fileData) {
+		return &fileData, nil
+	} else {
+		notifications.SendErrorNotification("Can only edit non binary files!")
+
+		return nil, errors.New("Can only edit non binary files")
 	}
 }
 
