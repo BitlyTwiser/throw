@@ -35,6 +35,14 @@ type IpfsClient struct {
 	Settings          *settings.Settings
 	nameInt           int
 	InvalidFileTypes  []string
+	FileMetadata      map[string]FileData
+}
+
+type FileData struct {
+	FileName   string
+	FileSize   int64
+	IpfsHash   string
+	UploadedAt time.Time
 }
 
 type Empty struct{}
@@ -133,6 +141,13 @@ func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileNam
 		return errors.New("server did not say successful")
 	}
 
+	c.SaveFileMetadata(FileData{
+		FileName:   fileName,
+		FileSize:   fileSize,
+		IpfsHash:   "",
+		UploadedAt: time.Now(),
+	})
+
 	c.FileUpload <- fileName
 	c.FileUploadedInApp <- true
 
@@ -178,6 +193,14 @@ func (c *IpfsClient) UploadFile(path, fileName string) error {
 			return err
 		}
 	}
+
+	c.SaveFileMetadata(FileData{
+		FileName:   fileName,
+		FileSize:   fileSize,
+		IpfsHash:   "",
+		UploadedAt: time.Now(),
+	})
+
 	notifications.SendSuccessNotification("File uploaded")
 
 	return nil
@@ -200,6 +223,8 @@ func (c *IpfsClient) DeleteFile(fileName string, showMessage bool) error {
 	} else {
 		return fmt.Errorf("error occured deleting file: %v", resp)
 	}
+
+	c.DeleteFileMetadata(fileName)
 
 	// Push onto a different channel for refreshing files.
 	c.DeletedFile <- fileName
@@ -382,6 +407,13 @@ func (c *IpfsClient) LoadFiles() {
 			break
 		}
 
+		c.SaveFileMetadata(FileData{
+			FileName:   file.Files.Filename,
+			FileSize:   file.Files.FileSize,
+			IpfsHash:   file.Files.IpfsHash,
+			UploadedAt: file.Files.UploadedAt.AsTime(),
+		})
+
 		c.Files = append(c.Files, file.Files.Filename)
 	}
 }
@@ -528,7 +560,7 @@ func (c *IpfsClient) DownloadedFileContent(fileName string) (*[]byte, error) {
 	} else {
 		notifications.SendErrorNotification("Can only edit non binary files!")
 
-		return nil, errors.New("Can only edit non binary files")
+		return nil, errors.New("can only edit non binary files")
 	}
 }
 
@@ -555,4 +587,25 @@ func (c *IpfsClient) validFileType(stream []byte) bool {
 	}
 
 	return true
+}
+
+func (c *IpfsClient) SaveFileMetadata(data FileData) {
+	fileName := data.FileName
+	c.FileMetadata[fileName] = FileData{
+		FileName: fileName,
+		FileSize: data.FileSize,
+		IpfsHash: data.IpfsHash,
+	}
+}
+
+func (c *IpfsClient) GetFileMetadata(fileName string) *FileData {
+	if v, ok := c.FileMetadata[fileName]; ok {
+		return &v
+	} else {
+		return nil
+	}
+}
+
+func (c *IpfsClient) DeleteFileMetadata(fileName string) {
+	delete(c.FileMetadata, fileName)
 }
