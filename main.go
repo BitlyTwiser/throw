@@ -35,20 +35,20 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 		func() int { return len(client.Files) },
 		func() fyne.CanvasObject {
 			deleteButton := widget.NewButtonWithIcon("", theme.DeleteIcon(), nil)
-			deleteButton.Resize(fyne.NewSize(5, 5))
 
 			downloadButton := widget.NewButtonWithIcon("", theme.DownloadIcon(), nil)
-			downloadButton.Resize(fyne.NewSize(5, 5))
 
 			editButton := widget.NewButtonWithIcon("", theme.ContentAddIcon(), nil)
-			editButton.Resize(fyne.NewSize(5, 5))
+
+			fileMetadata := widget.NewButtonWithIcon("", theme.QuestionIcon(), nil)
 
 			fileNameLabel := widget.NewLabel("")
 			fileNameLabel.Wrapping = 1
 
 			return container.NewGridWithColumns(
-				4,
+				5,
 				container.NewPadded(fileNameLabel),
+				container.NewPadded(fileMetadata),
 				container.NewPadded(editButton),
 				container.NewPadded(downloadButton),
 				container.NewPadded(deleteButton),
@@ -57,6 +57,9 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 		func(i widget.ListItemID, o fyne.CanvasObject) {
 			o.(*fyne.Container).Objects[0].(*fyne.Container).Objects[0].(*widget.Label).SetText(client.Files[i])
 			o.(*fyne.Container).Objects[1].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
+				pufs_client.FileMetadata(*client.GetFileMetadata(client.Files[i]))
+			}
+			o.(*fyne.Container).Objects[2].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
 				fileName := client.Files[i]
 				w := fyne.CurrentApp().NewWindow(fmt.Sprintf("Edit %v", fileName))
 				w.Resize(fyne.NewSize(300, 400))
@@ -82,10 +85,10 @@ func initializeUI(w fyne.Window, client pufs_client.IpfsClient) {
 
 				w.Show()
 			}
-			o.(*fyne.Container).Objects[2].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
+			o.(*fyne.Container).Objects[3].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
 				client.Download(client.Files[i])
 			}
-			o.(*fyne.Container).Objects[3].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
+			o.(*fyne.Container).Objects[4].(*fyne.Container).Objects[0].(*widget.Button).OnTapped = func() {
 				var message *fyne.Notification
 				fileName := client.Files[i]
 				err := client.DeleteFile(fileName, true)
@@ -163,6 +166,7 @@ func main() {
 		FileUploadedInApp: make(chan bool, 2),
 		Settings:          s,
 		InvalidFileTypes:  []string{"ELF", "EXE"},
+		FileMetadata:      make(map[string]pufs_client.FileData),
 	}
 	// Remove  client after connection ends
 	defer client.UnsubscribeClient()
