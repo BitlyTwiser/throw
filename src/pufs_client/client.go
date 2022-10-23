@@ -42,7 +42,7 @@ type FileData struct {
 	FileName   string
 	FileSize   int64
 	IpfsHash   string
-	UploadedAt time.Time
+	UploadedAt string
 }
 
 type Empty struct{}
@@ -145,7 +145,7 @@ func (c *IpfsClient) UploadFileStream(fileData *os.File, fileSize int64, fileNam
 		FileName:   fileName,
 		FileSize:   fileSize,
 		IpfsHash:   "",
-		UploadedAt: time.Now(),
+		UploadedAt: time.Now().String(),
 	})
 
 	c.FileUpload <- fileName
@@ -198,7 +198,7 @@ func (c *IpfsClient) UploadFile(path, fileName string) error {
 		FileName:   fileName,
 		FileSize:   fileSize,
 		IpfsHash:   "",
-		UploadedAt: time.Now(),
+		UploadedAt: time.Now().String(),
 	})
 
 	notifications.SendSuccessNotification("File uploaded")
@@ -406,12 +406,13 @@ func (c *IpfsClient) LoadFiles() {
 			log.Fatalf("Error reading file stream. Error: %v", err)
 			break
 		}
-
+		t := time.Unix(file.Files.UploadedAt.Seconds, 0)
+		date := t.Format(time.UnixDate)
 		c.SaveFileMetadata(FileData{
 			FileName:   file.Files.Filename,
 			FileSize:   file.Files.FileSize,
 			IpfsHash:   file.Files.IpfsHash,
-			UploadedAt: file.Files.UploadedAt.AsTime(),
+			UploadedAt: date,
 		})
 
 		c.Files = append(c.Files, file.Files.Filename)
@@ -592,9 +593,10 @@ func (c *IpfsClient) validFileType(stream []byte) bool {
 func (c *IpfsClient) SaveFileMetadata(data FileData) {
 	fileName := data.FileName
 	c.FileMetadata[fileName] = FileData{
-		FileName: fileName,
-		FileSize: data.FileSize,
-		IpfsHash: data.IpfsHash,
+		FileName:   fileName,
+		FileSize:   data.FileSize,
+		IpfsHash:   data.IpfsHash,
+		UploadedAt: data.UploadedAt,
 	}
 }
 
