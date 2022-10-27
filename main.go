@@ -136,7 +136,7 @@ func main() {
 	a := app.New()
 	w := a.NewWindow("Throw")
 	w.SetMaster()
-	w.Resize(fyne.NewSize(750, 500))
+	w.SetFullScreen(true)
 
 	rand.Seed(time.Now().UTC().UnixNano())
 	//Note: Look to add validation server side that ID is unique.
